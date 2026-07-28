@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    ruby-whatsapp (0.1.0)
+    ruby-whatsapp (0.2.0)
       activemodel (>= 7.0)
       http (~> 5.1)
       logger (>= 1.0)
