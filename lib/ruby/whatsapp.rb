@@ -3,26 +3,36 @@
 require "logger"
 require "uri"
 require "http"
-require "event_stream_parser"
 require "zeitwerk"
-require "active_model/validations"
+require "active_model"
 
 loader = Zeitwerk::Loader.for_gem
-loader.enable_reloading
+loader.collapse(__dir__)
 loader.setup
 
-module Ruby
-  module Whatsapp
-    class Error < StandardError; end
-    # Your code goes here...
+module Whatsapp
+  class Error < StandardError; end
 
-    class << self
-      attr_accessor :configuration
+  class << self
+    attr_writer :configuration
 
-      def configure
-        self.configuration ||= Whatsapp::Configuration.new
+    # Returns the global configuration, lazily initializing it on first use.
+    # @return [Whatsapp::Configuration]
+    def configuration
+      @configuration ||= Configuration.new
+    end
 
-        yield(configuration) if block_given?
-      end
+    # Yields the configuration for mutation and returns it.
+    # @yieldparam configuration [Whatsapp::Configuration]
+    # @return [Whatsapp::Configuration]
+    def configure
+      yield(configuration) if block_given?
+
+      configuration
+    end
   end
 end
+
+# Exposed so the whole constant tree can be eagerly loaded (used in tests to
+# guarantee every file resolves under Zeitwerk).
+Whatsapp.define_singleton_method(:eager_load!) { loader.eager_load }
