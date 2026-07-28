@@ -2,32 +2,16 @@ PATH
   remote: .
   specs:
     ruby-whatsapp (0.1.0)
-      base64
-      event_stream_parser
-      http
-      logger
-      openssl
-      zeitwerk
+      activemodel (>= 7.0)
+      http (~> 5.1)
+      logger (>= 1.0)
+      zeitwerk (~> 2.6)
 
 GEM
   remote: https://rubygems.org/
   specs:
-    actionpack (8.1.2)
-      actionview (= 8.1.2)
+    activemodel (8.1.2)
       activesupport (= 8.1.2)
-      nokogiri (>= 1.8.5)
-      rack (>= 2.2.4)
-      rack-session (>= 1.0.1)
-      rack-test (>= 0.6.3)
-      rails-dom-testing (~> 2.2)
-      rails-html-sanitizer (~> 1.6)
-      useragent (~> 0.16)
-    actionview (8.1.2)
-      activesupport (= 8.1.2)
-      builder (~> 3.1)
-      erubi (~> 1.11)
-      rails-dom-testing (~> 2.2)
-      rails-html-sanitizer (~> 1.6)
     activesupport (8.1.2)
       base64
       bigdecimal
@@ -46,7 +30,6 @@ GEM
     ast (2.4.3)
     base64 (0.3.0)
     bigdecimal (4.0.1)
-    builder (3.3.0)
     byebug (12.0.0)
     coderay (1.1.3)
     concurrent-ruby (1.3.6)
@@ -54,28 +37,14 @@ GEM
     crack (1.0.1)
       bigdecimal
       rexml
-    crass (1.0.6)
     date (3.5.1)
     diff-lcs (1.6.2)
     domain_name (0.6.20240107)
-    dotenv (3.2.0)
-    dotenv-rails (3.2.0)
-      dotenv (= 3.2.0)
-      railties (>= 6.1)
     drb (2.2.3)
     erb (6.0.1)
-    erubi (1.13.1)
-    event_stream_parser (1.0.0)
-    factory_bot (6.5.6)
-      activesupport (>= 6.1.0)
-    ffi (1.17.3-aarch64-linux-gnu)
-    ffi (1.17.3-aarch64-linux-musl)
-    ffi (1.17.3-arm-linux-gnu)
-    ffi (1.17.3-arm-linux-musl)
+    faker (3.6.1)
+      i18n (>= 1.8.11, < 2)
     ffi (1.17.3-arm64-darwin)
-    ffi (1.17.3-x86_64-darwin)
-    ffi (1.17.3-x86_64-linux-gnu)
-    ffi (1.17.3-x86_64-linux-musl)
     ffi-compiler (1.3.2)
       ffi (>= 1.15.5)
       rake
@@ -102,29 +71,9 @@ GEM
       ffi-compiler (~> 1.0)
       rake (~> 13.0)
     logger (1.7.0)
-    loofah (2.25.0)
-      crass (~> 1.0.2)
-      nokogiri (>= 1.12.0)
     method_source (1.1.0)
     minitest (6.0.1)
       prism (~> 1.5)
-    nokogiri (1.19.0-aarch64-linux-gnu)
-      racc (~> 1.4)
-    nokogiri (1.19.0-aarch64-linux-musl)
-      racc (~> 1.4)
-    nokogiri (1.19.0-arm-linux-gnu)
-      racc (~> 1.4)
-    nokogiri (1.19.0-arm-linux-musl)
-      racc (~> 1.4)
-    nokogiri (1.19.0-arm64-darwin)
-      racc (~> 1.4)
-    nokogiri (1.19.0-x86_64-darwin)
-      racc (~> 1.4)
-    nokogiri (1.19.0-x86_64-linux-gnu)
-      racc (~> 1.4)
-    nokogiri (1.19.0-x86_64-linux-musl)
-      racc (~> 1.4)
-    openssl (4.0.0)
     parallel (1.27.0)
     parser (3.3.10.1)
       ast (~> 2.4.1)
@@ -144,30 +93,6 @@ GEM
       stringio
     public_suffix (7.0.2)
     racc (1.8.1)
-    rack (3.2.4)
-    rack-session (2.1.1)
-      base64 (>= 0.1.0)
-      rack (>= 3.0.0)
-    rack-test (2.2.0)
-      rack (>= 1.3)
-    rackup (2.3.1)
-      rack (>= 3)
-    rails-dom-testing (2.3.0)
-      activesupport (>= 5.0.0)
-      minitest
-      nokogiri (>= 1.6)
-    rails-html-sanitizer (1.6.2)
-      loofah (~> 2.21)
-      nokogiri (>= 1.15.7, != 1.16.7, != 1.16.6, != 1.16.5, != 1.16.4, != 1.16.3, != 1.16.2, != 1.16.1, != 1.16.0.rc1, != 1.16.0)
-    railties (8.1.2)
-      actionpack (= 8.1.2)
-      activesupport (= 8.1.2)
-      irb (~> 1.13)
-      rackup (>= 1.0.0)
-      rake (>= 12.2)
-      thor (~> 1.0, >= 1.2.2)
-      tsort (>= 0.2)
-      zeitwerk (~> 2.6)
     rainbow (3.1.1)
     rake (13.3.1)
     rdoc (7.1.0)
@@ -206,9 +131,6 @@ GEM
       parser (>= 3.3.7.2)
       prism (~> 1.7)
     rubocop-basic (1.2.0)
-    rubocop-factory_bot (2.28.0)
-      lint_roller (~> 1.1)
-      rubocop (~> 1.72, >= 1.72.1)
     rubocop-rake (0.7.1)
       lint_roller (~> 1.1)
       rubocop (>= 1.72.1)
@@ -217,10 +139,7 @@ GEM
       rubocop (~> 1.81)
     ruby-progressbar (1.13.0)
     securerandom (0.4.1)
-    shoulda-matchers (7.0.1)
-      activesupport (>= 7.1)
     stringio (3.2.0)
-    thor (1.5.0)
     tsort (0.2.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
@@ -228,7 +147,6 @@ GEM
       unicode-emoji (~> 4.1)
     unicode-emoji (4.2.0)
     uri (1.1.1)
-    useragent (0.16.11)
     webmock (3.26.1)
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
@@ -236,29 +154,19 @@ GEM
     zeitwerk (2.7.4)
 
 PLATFORMS
-  aarch64-linux-gnu
-  aarch64-linux-musl
-  arm-linux-gnu
-  arm-linux-musl
   arm64-darwin
-  x86_64-darwin
-  x86_64-linux-gnu
-  x86_64-linux-musl
 
 DEPENDENCIES
-  dotenv-rails
-  factory_bot (~> 6.5.6)
+  faker (~> 3.5)
   irb
   pry-byebug
   rake (~> 13.3.1)
   rspec (~> 3.13.2)
   rubocop
   rubocop-basic
-  rubocop-factory_bot
   rubocop-rake
   rubocop-rspec
   ruby-whatsapp!
-  shoulda-matchers (~> 7.0.1)
   webmock
 
 BUNDLED WITH

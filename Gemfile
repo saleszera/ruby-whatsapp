@@ -2,20 +2,19 @@
 
 source "https://rubygems.org"
 
-# Specify your gem's dependencies in ruby-chatkit.gemspec
+# Specify your gem's dependencies in ruby-whatsapp.gemspec
 gemspec
 
 gem "irb"
 gem "rake", "~> 13.3.1"
 
-gem "dotenv-rails"
-gem "factory_bot", "~> 6.5.6"
+gem "faker", "~> 3.5"
 gem "rspec", "~> 3.13.2"
 gem "webmock"
+
 gem "pry-byebug"
+
 gem "rubocop"
 gem "rubocop-basic"
-gem "rubocop-factory_bot"
 gem "rubocop-rake"
 gem "rubocop-rspec"
-gem "shoulda-matchers", "~> 7.0.1"
