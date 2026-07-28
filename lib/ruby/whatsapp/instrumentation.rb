@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module ChatKit
+module Whatsapp
   # Instrumentation for logging HTTP requests and responses.
   class Instrumentation
     # @param logger [Logger] The logger instance to use for logging.
@@ -20,7 +20,9 @@ module ChatKit
     # @param payload [Hash] The payload containing event data.
     def start(_, payload)
       request = payload[:request]
-      @logger.info("#{request.verb.upcase} #{request.uri}")
+      uri = request.uri
+      # Log without the query string so identifiers/secrets in params are not logged.
+      @logger.info("#{request.verb.to_s.upcase} #{uri.scheme}://#{uri.host}#{uri.path}")
     end
 
     # @param payload [Hash] The payload containing event data.
