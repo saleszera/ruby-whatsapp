@@ -3,6 +3,7 @@
 module Whatsapp
   class Messages
     include ResponseHandling
+    extend ResponseHandling
 
     # Maps a public message kind to its implementing class. Resolution goes
     # through this frozen whitelist (never `const_get` on caller input), so an
@@ -33,6 +34,27 @@ module Whatsapp
         define_method(:"send_#{kind}!") do |client: Client.new, **payload|
           new(kind:, payload:, client:).send!
         end
+      end
+
+      # Marks a previously received message as read. Deliberately not part of
+      # KINDS: this action has no recipient/type envelope, so it can't be
+      # dispatched through the kind:/payload: factory the way the rest of the
+      # message kinds are.
+      # @param message_id [String] The WhatsApp message ID (WAMID) to mark as read.
+      # @param client [Whatsapp::Client] The WhatsApp client instance
+      # @return [Whatsapp::Messages::Response]
+      # @raise [ActiveModel::ValidationError] if message_id is missing
+      # @raise [Whatsapp::RequestError] if the request fails
+      def mark_message_as_read!(message_id:, client: Client.new)
+        payload = MarkMessageAsRead.new(message_id:)
+
+        response = client.connection.post(
+          client.path_for(client.phone_id, "messages"),
+          json: payload.serialize
+        )
+
+        checked_response = handle_response!(response, error_class: RequestError, action: "mark message as read")
+        Response.deserialize(checked_response.parse)
       end
     end
 
