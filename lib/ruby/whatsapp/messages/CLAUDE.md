@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Purpose
 
-This directory contains every message type supported by the WhatsApp Cloud API. Each file maps directly to one API message type. The entry point `messages.rb` (one level up) acts as a factory that resolves the correct class by kind and calls `send!`; it also defines a `send_<kind>!` convenience class method per entry in its `KINDS` registry (e.g. `Whatsapp::Messages.send_text!(to:, body:)`), generated automatically so a new kind gets one for free the moment it's registered.
+This directory contains every message type supported by the WhatsApp Cloud API. Each file maps directly to one API message type. The entry point `messages.rb` (one level up) acts as a factory that resolves the correct class by kind and calls `send!`; it also defines a `send_<kind>!` convenience class method per entry in its `KINDS` registry (e.g. `Whatsapp::Messages.send_text!(to:, body:)`), generated automatically so a new kind gets one for free the moment it's registered. One class, `MarkMessageAsRead`, doesn't fit that registry (no recipient/envelope) and instead gets its own hand-written class method, `Messages.mark_message_as_read!`.
 
 ## Conventions
 
@@ -33,7 +33,7 @@ Response                         # top-level: messaging_product, contacts, messa
   Response::Messages             # id
 ```
 
-Each class exposes a class-level `.deserialize(data)` that maps raw JSON hash keys to typed attributes. When adding a new message type that returns additional response fields, extend this tree rather than adding ad-hoc parsing elsewhere.
+Each class exposes a class-level `.deserialize(data)` that maps raw JSON hash keys to typed attributes. When adding a new message type that returns additional response fields, extend this tree rather than adding ad-hoc parsing elsewhere — e.g. `Response#success` is one such extension: `nil` for normal message-send responses, `true`/`false` for status-update endpoints like `MarkMessageAsRead` that reply with `{ "success": true }` instead of `{ messaging_product, contacts, messages }`.
 
 ### Stub classes
 
@@ -41,7 +41,7 @@ There are currently no stub classes — every registered message type is impleme
 
 ## Message Kinds Reference
 
-One entry per kind registered in `KINDS` (`lib/ruby/whatsapp/messages.rb`). Every example below has been run against the real classes (`bundle exec ruby -Ilib`), and most have been sent through the live Meta Cloud API during development — the serialized output shown is exact, not illustrative.
+One entry per kind registered in `KINDS` (`lib/ruby/whatsapp/messages.rb`), plus `MarkMessageAsRead`, the one deliberate exception (see below). Every example below has been run against the real classes (`bundle exec ruby -Ilib`), and most have been sent through the live Meta Cloud API during development — the serialized output shown is exact, not illustrative.
 
 ### Text (`text.rb`)
 
@@ -274,7 +274,24 @@ Whatsapp::Messages::Interactive.new(
 
 **`:product_carousel`** — 2 to 10 cards referencing products in a Meta catalog (`catalog_id:`/`product_retailer_id:` per card). Same caveat applies to the wire value `"product_list"`.
 
+### Mark Message As Read (`mark_message_as_read.rb`)
+
+Closes the read-receipt loop — powers the "seen" checkmarks on the user's side. Meta requires this within 30 days of receipt, and marking one message read also marks every earlier message in that conversation as read.
+
+**Deliberately not registered in `KINDS`.** Every other kind shares the `to`/`recipient_type`/`type` envelope from `Base`, but this endpoint's payload is flat (`messaging_product`, `status`, `message_id` — no recipient, no `type`), so `MarkMessageAsRead` doesn't inherit `Base` at all (same as the `Sub-objects` above), and there's no `to:` for the `kind:`/`payload:` factory to key off. Rather than adding an `if`/`next` exception inside the `KINDS.each_key` loop that generates `send_<kind>!` methods, `messages.rb` gives it its own hand-written class method, `Messages.mark_message_as_read!(message_id:, client: Client.new)`, which reuses `handle_response!` (via `Messages` also `extend`ing `ResponseHandling`, not just `include`ing it) and `Response.deserialize` directly.
+
+- `message_id:` required (presence only, no format check — an invalid WAMID surfaces server-side as error `131009`).
+
+```ruby
+Whatsapp::Messages::MarkMessageAsRead.new(message_id: "wamid.HBg...").serialize
+# => { messaging_product: "whatsapp", status: "read", message_id: "wamid.HBg..." }
+```
+
+The API responds with `{ "success": true }` rather than the usual `{ messaging_product, contacts, messages }` shape — see `Response#success` in the "Response deserialization" section above.
+
 ## Adding a new message type (checklist)
+
+This checklist assumes the common case: a message sent *to a recipient*, sharing the `to`/`recipient_type`/`type` envelope. If the new type has no recipient or doesn't share that envelope (like `MarkMessageAsRead`), skip inheriting `Base` and registering it in `KINDS`, and instead give it its own hand-written class method in `messages.rb` — see the `Mark Message As Read` entry above for the precedent.
 
 - [ ] Write a failing spec under `spec/ruby/whatsapp/messages/<type>_spec.rb`
 - [ ] Create `lib/ruby/whatsapp/messages/<type>.rb` inheriting `Base`
