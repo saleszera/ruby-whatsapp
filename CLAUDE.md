@@ -21,6 +21,8 @@ bundle exec rubocop
 bin/console
 ```
 
+Webhook support only becomes active inside a host Rails app — `rake whatsapp:install:webhook` (installs `app/controllers/whatsapp/webhooks_controller.rb`) is not runnable standalone in this repo, since it has no Rails application to install into.
+
 ## Architecture
 
 This is a Ruby gem (`ruby-whatsapp`) providing a client for the Meta WhatsApp Cloud API. Auto-loading is handled by Zeitwerk.
@@ -53,6 +55,12 @@ All message classes validate `:to` (recipient phone number) and implement `seria
 **Response parsing:** `Messages::Response.deserialize` maps the API JSON response into `Response::Contacts` and `Response::Messages` objects.
 
 **Language codes:** `Whatsapp::Utils::LanguageCodes` contains the full list of supported WhatsApp template language codes.
+
+**Webhooks (inbound):** `Whatsapp::Webhook` deserializes Meta's incoming webhook notifications — the opposite direction from everything above. See `lib/ruby/whatsapp/webhook/CLAUDE.md` for the full dispatch-table conventions and field reference; in short:
+
+- `Whatsapp::Webhook::Notification.deserialize(JSON.parse(body))` → `Entry[]` → `Change[]` (`field` + `value`), dispatched through a frozen `FIELDS` registry (mirrors `Messages::KINDS`) to one class per Meta-documented field. Only `messages` has a confirmed schema; the other 18 are best-effort.
+- `Whatsapp::Webhook::Verification.call(params:)` / `Whatsapp::Webhook::Signature.valid?(payload:, header:)` handle the GET handshake and the `X-Hub-Signature-256` HMAC check, both defaulting to `Whatsapp.configuration.verify_token`/`app_secret` but overridable per call (for multi-tenant apps with per-account credentials).
+- `rake whatsapp:install:webhook` (via `Whatsapp::Railtie`, only active when Rails is loaded) copies a personalizable `app/controllers/whatsapp/webhooks_controller.rb` into the host app using `Whatsapp::Webhook::Installer`.
 
 ## Code Principles
 
