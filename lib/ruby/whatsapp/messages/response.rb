@@ -15,13 +15,20 @@ module Whatsapp
       #   @return [Array<Messages>]
       attr_accessor :messages
 
+      # @!attribute [rw] success
+      #   @return [Boolean, nil] Present on status-update responses (e.g. mark-message-as-read);
+      #     nil on normal message-send responses.
+      attr_accessor :success
+
       # @param messaging_product [String] The messaging product used (e.g., "whatsapp").
       # @param contacts [Array<Contacts>] The list of contact responses.
       # @param messages [Array<Messages>] The list of message responses.
-      def initialize(messaging_product:, contacts:, messages:)
+      # @param success [Boolean, nil] The status-update success flag, if present.
+      def initialize(messaging_product:, contacts:, messages:, success: nil)
         @messaging_product = messaging_product
         @contacts = contacts
         @messages = messages
+        @success = success
       end
 
       class << self
@@ -32,7 +39,8 @@ module Whatsapp
           new(
             messaging_product: data["messaging_product"],
             contacts: Array(data["contacts"]).map { |contact_data| Contacts.deserialize(contact_data) },
-            messages: Array(data["messages"]).map { |message_data| Messages.deserialize(message_data) }
+            messages: Array(data["messages"]).map { |message_data| Messages.deserialize(message_data) },
+            success: data["success"]
           )
         end
       end

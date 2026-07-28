@@ -24,5 +24,17 @@ RSpec.describe Whatsapp::Messages::Response do
       expect(response.contacts).to eq([])
       expect(response.messages).to eq([])
     end
+
+    it "maps success for status-update responses like mark-message-as-read" do
+      response = described_class.deserialize({ "success" => true })
+
+      expect(response.success).to be(true)
+    end
+
+    it "defaults success to nil when absent, for normal message-send responses" do
+      response = described_class.deserialize({ "messaging_product" => "whatsapp" })
+
+      expect(response.success).to be_nil
+    end
   end
 end
