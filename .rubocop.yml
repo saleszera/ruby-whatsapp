@@ -2,7 +2,6 @@ inherit_gem:
   rubocop-basic: rubocop.yml
 
 plugins:
-  - rubocop-factory_bot
   - rubocop-rake
   - rubocop-rspec
 
@@ -36,7 +35,19 @@ RSpec/MultipleExpectations:
 RSpec/MultipleMemoizedHelpers:
   Enabled: false
 
-RSpec/SpecFilePathFormat:
-  CustomTransform:
-    ChatKit: chatkit
-    ChatKitConfiguration: chatkit_configuration
+# Most classes are small nested value objects whose purpose is clear from their
+# name and the source-doc link on the message class; a doc comment on every one
+# is noise. Message classes still carry descriptive comments by convention.
+Style/Documentation:
+  Enabled: false
+
+# The interactive value objects inherit Interactive::Base, which holds no
+# instance state, so there is nothing for a parent initialize to set up.
+Lint/MissingSuper:
+  Enabled: false
+
+# `Media#delete` mirrors the REST verb and returns a success boolean; it is not
+# a predicate query.
+Naming/PredicateMethod:
+  AllowedMethods:
+    - delete
