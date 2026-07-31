@@ -65,14 +65,15 @@ module Whatsapp
       @app_secret = app_secret
     end
 
-    # Redacts the api_key and app_secret so they never leak into logs or console output.
+    # Redacts the api_key, app_secret, and verify_token so they never leak into logs or console output.
     # @return [String]
     def inspect
       redacted_api_key = api_key.nil? ? "nil" : "[REDACTED]"
       redacted_app_secret = app_secret.nil? ? "nil" : "[REDACTED]"
+      redacted_verify_token = verify_token.nil? ? "nil" : "[REDACTED]"
       "#<#{self.class.name} host=#{host.inspect} version=#{version.inspect} " \
         "api_key=#{redacted_api_key} phone_id=#{phone_id.inspect} waba_id=#{waba_id.inspect} " \
-        "verify_token=#{verify_token.inspect} app_secret=#{redacted_app_secret}>"
+        "verify_token=#{redacted_verify_token} app_secret=#{redacted_app_secret}>"
     end
   end
 end

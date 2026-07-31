@@ -62,7 +62,7 @@ Whatsapp.configure do |config|
 end
 ```
 
-`api_key` and `app_secret` are redacted from `Configuration#inspect`, so they will not leak into logs.
+`api_key`, `app_secret`, and `verify_token` are redacted from `Configuration#inspect`, so they will not leak into logs.
 
 ## Quick Start
 
