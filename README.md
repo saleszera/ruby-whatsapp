@@ -26,6 +26,7 @@ A small, dependency-light Ruby client for the [Meta WhatsApp Cloud API](https://
   - [Location Request](#location-request)
   - [Template](#template)
   - [Interactive](#interactive)
+  - [Mark Message As Read](#mark-message-as-read)
 - [Handling Responses](#handling-responses)
 - [Media](#media)
 - [Development](#development)
@@ -335,6 +336,14 @@ Whatsapp::Messages.send_interactive!(
 ```
 
 > **Note:** the wire values for the carousel types (`"carousel"` and `"product_list"`) are flagged in the source as worth double-checking against Meta's docs for your specific API version before relying on them in production.
+
+### Mark Message As Read
+
+```ruby
+Whatsapp::Messages.mark_message_as_read!(message_id: "wamid.HBgLMTU1NTU1NTU1NTUV...")
+```
+
+Marks an inbound message — and every earlier message in that conversation — as read, powering the "seen" checkmarks on the user's side. Must be called within 30 days of receipt. Unlike every other kind above, this isn't sent through `Messages.new(kind:, payload:).send!`: there's no recipient or `type` envelope, just `message_id:`, so it has its own dedicated method instead of a `kind:` in the factory.
 
 ## Handling Responses
 

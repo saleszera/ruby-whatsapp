@@ -152,4 +152,53 @@ RSpec.describe Whatsapp::Messages do
       end
     end
   end
+
+  describe ".mark_message_as_read!" do
+    let(:message_id) { "wamid.HBgLMTY1MDM4Nzk0MzkVAgARGBJDQjZCMzlEQUE4OTJBMTE4RTUA" }
+    let(:endpoint) { "https://graph.facebook.com/v24.0/PHONE_ID/messages" }
+    let(:success_body) { { success: true }.to_json }
+
+    it "posts the flat status-update body and returns a Response with success: true" do
+      stub = stub_request(:post, endpoint)
+        .with(
+          headers: { "Authorization" => "Bearer TEST_TOKEN" },
+          body: { messaging_product: "whatsapp", status: "read", message_id: }
+        )
+        .to_return(status: 200, body: success_body, headers: { "Content-Type" => "application/json" })
+
+      response = described_class.mark_message_as_read!(message_id:)
+
+      expect(stub).to have_been_requested
+      expect(response).to be_a(Whatsapp::Messages::Response)
+      expect(response.success).to be(true)
+    end
+
+    it "forwards an explicitly passed client instead of defaulting" do
+      custom_client = Whatsapp::Client.new(api_key: "CUSTOM_TOKEN", phone_id: "PHONE_ID")
+      stub = stub_request(:post, endpoint)
+        .with(headers: { "Authorization" => "Bearer CUSTOM_TOKEN" })
+        .to_return(status: 200, body: success_body, headers: { "Content-Type" => "application/json" })
+
+      described_class.mark_message_as_read!(message_id:, client: custom_client)
+
+      expect(stub).to have_been_requested
+    end
+
+    it "raises RequestError on a non-2xx response" do
+      stub_request(:post, endpoint).to_return(status: 400, body: "bad request")
+
+      expect { described_class.mark_message_as_read!(message_id:) }
+        .to raise_error(Whatsapp::RequestError, /Failed to mark message as read/)
+    end
+
+    it "raises ActiveModel::ValidationError for a missing message_id" do
+      expect { described_class.mark_message_as_read!(message_id: nil) }
+        .to raise_error(ActiveModel::ValidationError, /Message can't be blank/)
+    end
+
+    it "is not registered as a message kind" do
+      expect(Whatsapp::Messages::KINDS.keys).not_to include(:mark_message_as_read)
+      expect(described_class).not_to respond_to(:send_mark_message_as_read!)
+    end
+  end
 end
