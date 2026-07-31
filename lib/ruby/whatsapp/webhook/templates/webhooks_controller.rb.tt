@@ -1,0 +1,31 @@
+# frozen_string_literal: true
+
+module Whatsapp
+  class WebhooksController < ApplicationController
+    skip_before_action :verify_authenticity_token, raise: false
+
+    # GET — Meta calls this once when you save the callback URL in the App Dashboard.
+    def verify
+      challenge = Whatsapp::Webhook::Verification.call(params: params)
+      return head :forbidden unless challenge
+
+      render plain: challenge
+    end
+
+    # POST — Meta calls this for every event notification.
+    def receive
+      raw_body = request.body.read
+
+      unless Whatsapp::Webhook::Signature.valid?(payload: raw_body, header: request.headers["X-Hub-Signature-256"])
+        return head :unauthorized
+      end
+
+      notification = Whatsapp::Webhook::Notification.deserialize(JSON.parse(raw_body))
+
+      # TODO: your business logic here, e.g.:
+      # notification.entry.each { |entry| entry.changes.each { |change| WebhookJob.perform_later(change) } }
+
+      head :ok
+    end
+  end
+end

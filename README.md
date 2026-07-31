@@ -29,6 +29,7 @@ A small, dependency-light Ruby client for the [Meta WhatsApp Cloud API](https://
   - [Mark Message As Read](#mark-message-as-read)
 - [Handling Responses](#handling-responses)
 - [Media](#media)
+- [Webhooks](#webhooks)
 - [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
@@ -54,13 +55,15 @@ Whatsapp.configure do |config|
   config.api_key  = ENV.fetch("WHATSAPP_TOKEN")   # a Meta system-user / app access token
   config.phone_id = ENV.fetch("WHATSAPP_PHONE_ID") # the sending phone number ID
   # optional overrides:
-  # config.version  = "v24.0"
-  # config.host     = "https://graph.facebook.com"
-  # config.waba_id  = ENV.fetch("WHATSAPP_WABA_ID")
+  # config.version      = "v24.0"
+  # config.host         = "https://graph.facebook.com"
+  # config.waba_id      = ENV.fetch("WHATSAPP_WABA_ID")
+  # config.verify_token = ENV.fetch("WHATSAPP_VERIFY_TOKEN") # for webhooks, see below
+  # config.app_secret   = ENV.fetch("WHATSAPP_APP_SECRET")   # for webhooks, see below
 end
 ```
 
-`api_key` is redacted from `Configuration#inspect`, so it will not leak into logs.
+`api_key`, `app_secret`, and `verify_token` are redacted from `Configuration#inspect`, so they will not leak into logs.
 
 ## Quick Start
 
@@ -379,6 +382,73 @@ media.delete(media_id: media_id)                       # => true
 
 `download` refuses to attach the API token to a non-HTTPS URL or a host that is not on
 `Configuration#media_host_allowlist`, so a token is never sent to an attacker-influenced URL.
+
+## Webhooks
+
+Meta pushes inbound messages, delivery statuses, and ~18 other account/template
+notification types to a callback URL you register. Inside a Rails app:
+
+```bash
+bundle exec rake whatsapp:install:webhook
+```
+
+This copies a personalizable controller to `app/controllers/whatsapp/webhooks_controller.rb`
+and prints the routes and configuration you still need to add by hand:
+
+```ruby
+# config/routes.rb
+get  "/whatsapp/webhooks", to: "whatsapp/webhooks#verify"
+post "/whatsapp/webhooks", to: "whatsapp/webhooks#receive"
+
+# config/initializers/whatsapp.rb
+Whatsapp.configure do |config|
+  config.verify_token = Rails.application.credentials.whatsapp_verify_token
+  config.app_secret    = Rails.application.credentials.whatsapp_app_secret
+end
+```
+
+The generated controller is yours to edit — it deserializes every notification into typed
+objects and leaves a `# TODO` where your own handling goes:
+
+```ruby
+class Whatsapp::WebhooksController < ApplicationController
+  def verify
+    challenge = Whatsapp::Webhook::Verification.call(params: params)
+    challenge ? render(plain: challenge) : head(:forbidden)
+  end
+
+  def receive
+    raw_body = request.body.read
+    return head(:unauthorized) unless Whatsapp::Webhook::Signature.valid?(
+      payload: raw_body, header: request.headers["X-Hub-Signature-256"]
+    )
+
+    notification = Whatsapp::Webhook::Notification.deserialize(JSON.parse(raw_body))
+    # notification.entry.each { |entry| entry.changes.each { |change| WebhookJob.perform_later(change) } }
+
+    head :ok
+  end
+end
+```
+
+`notification.entry.first.changes.first` gives you a `field` (e.g. `"messages"`) and a typed
+`value` — for the `messages` field, `value.messages` and `value.statuses` are arrays of typed
+message/status objects (`Whatsapp::Webhook::Message::Text`, `Whatsapp::Webhook::Status`, etc.).
+The other ~18 documented fields (`account_alerts`, `message_template_status_update`, and so on)
+each deserialize into their own best-effort typed class — see
+[`lib/ruby/whatsapp/webhook/CLAUDE.md`](lib/ruby/whatsapp/webhook/CLAUDE.md) for the full field
+reference and confidence notes, since Meta's docs don't publish a JSON schema for most of them.
+
+**Multi-tenant apps** (many customers, each with their own Meta App) pass `verify_token:`/
+`app_secret:` explicitly instead of relying on the global config default:
+
+```ruby
+account = Account.find_by!(slug: params[:account_slug])
+Whatsapp::Webhook::Verification.call(params:, verify_token: account.verify_token)
+Whatsapp::Webhook::Signature.valid?(payload: raw_body, header:, app_secret: account.app_secret)
+```
+
+See Meta's [webhook documentation](https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/overview) for the full notification catalog, retry behavior, and signature details.
 
 ## Development
 
