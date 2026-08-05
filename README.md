@@ -29,6 +29,7 @@ A small, dependency-light Ruby client for the [Meta WhatsApp Cloud API](https://
   - [Mark Message As Read](#mark-message-as-read)
 - [Handling Responses](#handling-responses)
 - [Media](#media)
+- [Managing Templates](#managing-templates)
 - [Webhooks](#webhooks)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -57,7 +58,7 @@ Whatsapp.configure do |config|
   # optional overrides:
   # config.version      = "v24.0"
   # config.host         = "https://graph.facebook.com"
-  # config.waba_id      = ENV.fetch("WHATSAPP_WABA_ID")
+  # config.waba_id      = ENV.fetch("WHATSAPP_WABA_ID")   # for template management, see below
   # config.verify_token = ENV.fetch("WHATSAPP_VERIFY_TOKEN") # for webhooks, see below
   # config.app_secret   = ENV.fetch("WHATSAPP_APP_SECRET")   # for webhooks, see below
 end
@@ -87,6 +88,8 @@ response.messages.first.id # => "wamid.HBgLMTU1NTU1NTU1NTUV..."
 - **Pluggable instrumentation** — pass a `Logger` to `Whatsapp::Client.new` to log every request/response.
 - **Hardened media downloads** — `Media#download` refuses to attach the bearer token to non-HTTPS URLs or hosts outside an allowlist, so a token can never leak to an attacker-influenced URL.
 - **Structured response parsing** — `Whatsapp::Messages::Response` exposes typed `#contacts` and `#messages` instead of raw JSON.
+- **Template management** — create, list, edit and delete the message templates on your WhatsApp Business Account from Ruby, with Meta's documented rules checked client-side so a rejection costs a validation error instead of a 24-hour review cycle.
+- **Inbound webhook parsing** — a typed object tree for all 19 documented Meta notification field types, plus signature verification.
 
 ## Sending Messages
 
@@ -382,6 +385,176 @@ media.delete(media_id: media_id)                       # => true
 
 `download` refuses to attach the API token to a non-HTTPS URL or a host that is not on
 `Configuration#media_host_allowlist`, so a token is never sent to an attacker-influenced URL.
+
+## Managing Templates
+
+[Sending a template](#template) requires one that already exists and has been approved by
+Meta. `Whatsapp::MessageTemplates` creates and manages those templates, so they can live in
+your codebase and ship from CI instead of being clicked together in WhatsApp Manager.
+
+This is a different API from sending: it addresses your **WhatsApp Business Account**
+(`waba_id`, not `phone_id`) and needs the `whatsapp_business_management` permission.
+
+```ruby
+Whatsapp.configure do |config|
+  config.api_key = ENV["WHATSAPP_API_KEY"]
+  config.waba_id = ENV["WHATSAPP_WABA_ID"]
+end
+
+templates = Whatsapp::MessageTemplates.new
+```
+
+### Creating
+
+```ruby
+created = templates.create(
+  name: "order_confirmation",           # lowercase alphanumerics and underscores only
+  language: "en_US",
+  category: "UTILITY",                  # UTILITY | MARKETING | AUTHENTICATION
+  components: [
+    { type: :header, format: "TEXT", text: "Order {{1}} confirmed", example: ["#1234"] },
+    { type: :body,
+      text: "Thank you, {{1}}! Your order number is {{2}}.",
+      example: ["Pablo", "860198-230332"] },
+    { type: :footer, text: "Thanks for shopping with us" },
+    { type: :buttons, buttons: [
+      { type: :phone_number, text: "Call", phone_number: "15550051310" },
+      { type: :url, text: "Track order", url: "https://example.com/orders/{{1}}", example: "1234" },
+    ] },
+  ]
+)
+
+created.id       # => "1259544702043867"
+created.status   # => "PENDING" — Meta reviews asynchronously, up to 24 hours
+created.pending? # => true
+```
+
+Named parameters read better than positional ones for anything non-trivial:
+
+```ruby
+templates.create(
+  name: "order_confirmation", language: "en_US", category: "UTILITY",
+  parameter_format: "NAMED",
+  components: [
+    { type: :body,
+      text: "Thank you, {{first_name}}! Your order number is {{order_number}}.",
+      example: { first_name: "Pablo", order_number: "860198-230332" } },
+  ]
+)
+```
+
+Meta's rules are checked before the request, so a mistake raises immediately instead of
+costing a review cycle:
+
+```ruby
+templates.create(name: "Order Confirmation", ...)
+# => ActiveModel::ValidationError: Name must contain only lowercase alphanumeric
+#    characters and underscores
+
+templates.create(..., components: [{ type: :body, text: "Hi {{1}} and {{2}}", example: ["Pablo"] }])
+# => ActiveModel::ValidationError: Example does not match the body text:
+#    2 placeholders but 1 example
+```
+
+### Listing, reading, editing, deleting
+
+```ruby
+page = templates.list(status: %w[APPROVED], fields: %w[name category status], limit: 25)
+page.select(&:approved?).map(&:name)   # Collection is Enumerable
+page.remaining                         # headroom against your account's template cap
+templates.list(after: page.next_cursor) if page.next_cursor
+
+template = templates.find(template_id: "1259544702043867")
+template.status      # => "APPROVED"
+template.editable?   # => true (APPROVED, REJECTED and PAUSED templates can be edited)
+
+templates.update(template_id: template.id, category: "MARKETING")  # => true
+templates.update(template_id: template.id, components: [...])      # full replacement
+
+templates.delete(name: "order_confirmation")                       # every language variant
+templates.delete(hsm_id: "1407680676729941", name: "order_confirmation")
+templates.delete(hsm_ids: %w[1387372356726668 1304694804498707])   # up to 100
+```
+
+Editing an approved template re-submits it for review but it keeps working meanwhile.
+Approved templates allow 10 edits per 30 days and 1 per 24 hours. Deleting an approved
+template blocks reuse of its name for 30 days.
+
+### Other template kinds
+
+**Authentication (OTP)** templates invert the usual shape — Meta supplies and localises the
+wording, so you pass flags rather than text, and `upsert` creates every language at once:
+
+```ruby
+templates.upsert(
+  name: "authentication_code", languages: %w[en_US es_ES fr], category: "AUTHENTICATION",
+  components: [
+    { type: :body, add_security_recommendation: true },
+    { type: :footer, code_expiration_minutes: 15 },
+    { type: :buttons, buttons: [{ type: :otp, otp_type: "COPY_CODE" }] },
+  ]
+)
+```
+
+**Marketing carousels** take 2–10 cards that must all share the same structure:
+
+```ruby
+card = {
+  header: { format: "IMAGE", header_handle: "4::aW..." },
+  body: { text: "Rare {{1}} in stock!", example: ["Tulips"] },
+  buttons: [{ type: :quick_reply, text: "More like this" }],
+}
+
+templates.create(
+  name: "summer_carousel", language: "en_US", category: "MARKETING",
+  components: [
+    { type: :body, text: "Summer is here, {{1}}!", example: ["Pablo"] },
+    { type: :carousel, cards: [card, card] },
+  ]
+)
+```
+
+**Limited-time offers** add a countdown and a coupon code (marketing only; footers are not
+allowed and the body drops to 600 characters):
+
+```ruby
+templates.create(
+  name: "spring_offer", language: "en_US", category: "MARKETING",
+  components: [
+    { type: :header, format: "IMAGE", header_handle: "4::aW..." },
+    { type: :limited_time_offer, text: "Expiring offer!", has_expiration: true },
+    { type: :body, text: "Good news, {{1}}! Use code {{2}} for 25% off.",
+      example: ["Pablo", "SPRING25"] },
+    { type: :buttons, buttons: [
+      { type: :copy_code, example: "SPRING25" },
+      { type: :url, text: "Book now!", url: "https://example.com/o?c={{1}}", example: "n3mtql" },
+    ] },
+  ]
+)
+```
+
+**Library templates** are pre-written and pre-approved by Meta, so they usually come back
+`APPROVED` immediately:
+
+```ruby
+templates.create_from_library(
+  name: "my_delivery_update", language: "en_US", category: "UTILITY",
+  library_template_name: "delivery_update_1",
+  library_template_button_inputs: [
+    { type: "URL", url: { base_url: "https://example.com/{{1}}",
+                          url_suffix_example: "https://example.com/order_update" } },
+  ]
+)
+```
+
+### Notes
+
+- **Media headers** take a `header_handle` you already hold. Producing one needs Meta's
+  Resumable Upload API, which this gem does not wrap — note it is a different flow from
+  [`Media#upload`](#media), whose media IDs are for *sending*, not template creation.
+- **Review outcomes arrive by webhook**, not by polling: see
+  `message_template_status_update` and friends under [Webhooks](#webhooks).
+- Text containing `#{{1}}` needs single quotes in Ruby, or `#{` starts interpolation.
 
 ## Webhooks
 
