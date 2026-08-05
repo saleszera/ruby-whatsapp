@@ -54,7 +54,7 @@ module Whatsapp
         )
 
         checked_response = handle_response!(response, error_class: RequestError, action: "mark message as read")
-        Response.deserialize(checked_response.parse)
+        Response.deserialize(parse_json(checked_response))
       end
     end
 
@@ -110,7 +110,7 @@ module Whatsapp
     #   @param response [HTTP::Response] The HTTP response from the API
     #   @return [Whatsapp::Messages::Response] The parsed response object
     def parse!(response)
-      Response.deserialize(response.parse)
+      Response.deserialize(parse_json(response))
     end
   end
 end
