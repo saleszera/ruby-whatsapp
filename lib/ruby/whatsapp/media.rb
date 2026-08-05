@@ -36,7 +36,7 @@ module Whatsapp
         }
       )
 
-      handle_response!(response, error_class: MediaError, action: "upload media").parse["id"]
+      parse_json(handle_response!(response, error_class: MediaError, action: "upload media"))["id"]
     end
 
     # Retrieves the URL for a media asset.
@@ -49,7 +49,7 @@ module Whatsapp
         params: { phone_number_id: client.phone_id }
       )
 
-      handle_response!(response, error_class: MediaError, action: "get media URL").parse
+      parse_json(handle_response!(response, error_class: MediaError, action: "get media URL"))
     end
 
     # Downloads media from a media URL.
@@ -85,7 +85,7 @@ module Whatsapp
         params: { phone_number_id: client.phone_id }
       )
 
-      parsed = handle_response!(response, error_class: MediaError, action: "delete media").parse
+      parsed = parse_json(handle_response!(response, error_class: MediaError, action: "delete media"))
       parsed.is_a?(Hash) && parsed["success"] == true
     end
 
