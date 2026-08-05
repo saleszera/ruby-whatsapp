@@ -6,6 +6,26 @@ require "tmpdir"
 RSpec.describe Whatsapp::Media do
   subject(:media) { described_class.new(client: Whatsapp::Client.new) }
 
+  # The Graph API labels its JSON `text/javascript`, which the http gem cannot
+  # infer a parser for. Every read path must name the format explicitly.
+  describe "response content type" do
+    let(:js) { { "Content-Type" => "text/javascript; charset=UTF-8" } }
+
+    it "parses a media URL response served as text/javascript" do
+      stub_request(:get, "https://graph.facebook.com/v24.0/MEDIA_ID").with(query: { phone_number_id: "PHONE_ID" })
+        .to_return(status: 200, headers: js, body: { url: "https://lookaside.fbsbx.com/x" }.to_json)
+
+      expect(media.get_url(media_id: "MEDIA_ID")["url"]).to eq("https://lookaside.fbsbx.com/x")
+    end
+
+    it "parses a delete response served as text/javascript" do
+      stub_request(:delete, "https://graph.facebook.com/v24.0/MEDIA_ID").with(query: { phone_number_id: "PHONE_ID" })
+        .to_return(status: 200, headers: js, body: { success: true }.to_json)
+
+      expect(media.delete(media_id: "MEDIA_ID")).to be(true)
+    end
+  end
+
   describe "#upload" do
     it "posts the file to the versioned media endpoint and returns the media id" do
       file = Tempfile.new(["pic", ".jpg"])
@@ -30,7 +50,7 @@ RSpec.describe Whatsapp::Media do
 
   describe "#get_url" do
     it "requests the media id endpoint and returns the parsed body" do
-      stub_request(:get, "https://graph.facebook.com/v24.0/MEDIA_ID")
+      stub_request(:get, "https://graph.facebook.com/v24.0/MEDIA_ID").with(query: { phone_number_id: "PHONE_ID" })
         .with(query: { phone_number_id: "PHONE_ID" })
         .to_return(status: 200, body: { url: "https://lookaside.fbsbx.com/m/1" }.to_json,
           headers: { "Content-Type" => "application/json" })
@@ -41,7 +61,7 @@ RSpec.describe Whatsapp::Media do
 
   describe "#delete" do
     it "returns true when the API reports success" do
-      stub_request(:delete, "https://graph.facebook.com/v24.0/MEDIA_ID")
+      stub_request(:delete, "https://graph.facebook.com/v24.0/MEDIA_ID").with(query: { phone_number_id: "PHONE_ID" })
         .with(query: { phone_number_id: "PHONE_ID" })
         .to_return(status: 200, body: { success: true }.to_json, headers: { "Content-Type" => "application/json" })
 
