@@ -21,6 +21,18 @@ module Whatsapp
       raise error_class, "Failed to #{action}: #{response.status} - #{truncate_body(response)}"
     end
 
+    # Parses a response body as JSON, naming the format instead of inferring it.
+    #
+    # The Graph API labels its JSON responses `text/javascript`, which the http gem
+    # has no MIME handler for — `HTTP::Response#parse` with no argument raises
+    # `HTTP::Error: Unknown MIME type: text/javascript`. Every endpoint this gem
+    # talks to returns JSON, so the format is always safe to state outright.
+    # @param response [HTTP::Response]
+    # @return [Hash, Array] the parsed body
+    def parse_json(response)
+      response.parse(:json)
+    end
+
     # @return [String] the response body truncated to MAX_ERROR_BODY characters
     def truncate_body(response)
       body = response.body.to_s
