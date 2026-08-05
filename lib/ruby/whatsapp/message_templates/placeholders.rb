@@ -10,7 +10,9 @@ module Whatsapp
     #
     # Placeholder names are collapsed to unique values in order of first appearance:
     # Meta counts a repeated `{{1}}` or `{{name}}` as one parameter, so the count a
-    # caller must supply examples for is the unique count.
+    # caller must supply examples for is the unique count — that is {.count}. Where a
+    # rule is about *position* rather than parameters, {.occurrences} counts repeats
+    # instead; see the URL button.
     # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/templates/overview
     module Placeholders
       # Matches `{{name}}` / `{{1}}`, tolerating internal whitespace. Deliberately
@@ -28,6 +30,15 @@ module Whatsapp
       # @return [Integer] The number of unique placeholders.
       def self.count(text)
         extract(text).size
+      end
+
+      # @param text [String, nil]
+      # @return [Integer] The number of placeholder occurrences, counting repeats.
+      #   Contrast {.count}, which collapses repeated names. The URL button rule is
+      #   positional — a single variable, appended at the very end — so a second
+      #   occurrence breaks it even when it names the same parameter.
+      def self.occurrences(text)
+        text.to_s.scan(PATTERN).size
       end
 
       # @param text [String, nil]

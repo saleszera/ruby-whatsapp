@@ -225,6 +225,12 @@ hash copied straight out of the docs.
 |---|---|
 | `QuickReply` | `text` ≤ 25 |
 | `Url` | `text` ≤ 25, `url` ≤ 2000, at most one variable and it must be **at the end**, `example` required when it has one (a **flat array on the button**, unlike header/body) |
+
+> The URL variable is counted by **occurrence** (`Placeholders.occurrences`), not by unique
+> name, so `.../{{1}}/details/{{1}}` is rejected: it ends in a placeholder and names one
+> parameter, but the leading one still sits mid-URL. Everywhere else — body examples above
+> all — the unique count (`Placeholders.count`) is the correct one, since Meta treats a
+> repeated `{{1}}` as a single parameter needing a single example.
 | `PhoneNumber` | `text` ≤ 25, `phone_number` ≤ 20 |
 | `CopyCode` | `example` ≤ 20 (a **bare string**), **no `text`** — Meta supplies the label |
 | `Otp` | `otp_type`: `COPY_CODE`/`ONE_TAP`/`ZERO_TAP`/`NO_BUTTONS`. `supported_apps` required for one/zero-tap, `zero_tap_terms_accepted` must be true for zero-tap. `text`/`autofill_text` rejected — Meta localises them |

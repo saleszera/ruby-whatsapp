@@ -72,15 +72,19 @@ module Whatsapp
 
         # @return [Boolean] Whether the URL declares a placeholder.
         def variable?
-          Placeholders.count(url).positive?
+          Placeholders.occurrences(url).positive?
         end
 
         # A URL may carry at most one variable, and it must be the trailing segment.
+        #
+        # Counted by occurrence, not by unique name: `.../{{1}}/details/{{1}}` ends in a
+        # placeholder and names only one parameter, but the leading one still sits
+        # mid-URL, which is exactly what Meta forbids.
         # @return [void]
         def validate_variable
           return if blank_value?(url)
 
-          count = Placeholders.count(url)
+          count = Placeholders.occurrences(url)
           return if count.zero?
 
           if count > Defaults::MAX_VARIABLES

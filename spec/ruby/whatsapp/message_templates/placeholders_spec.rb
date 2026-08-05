@@ -41,6 +41,25 @@ RSpec.describe Whatsapp::MessageTemplates::Placeholders do
     end
   end
 
+  describe ".occurrences" do
+    it "counts repeats rather than collapsing them, unlike .count" do
+      expect(described_class.occurrences("{{1}} {{2}} {{1}}")).to eq(3)
+      expect(described_class.count("{{1}} {{2}} {{1}}")).to eq(2)
+    end
+
+    it "returns zero for text without placeholders" do
+      expect(described_class.occurrences("plain")).to eq(0)
+    end
+
+    it "returns zero for nil" do
+      expect(described_class.occurrences(nil)).to eq(0)
+    end
+
+    it "ignores malformed braces" do
+      expect(described_class.occurrences("{{}} {{ }} {single} {{a-b}}")).to eq(0)
+    end
+  end
+
   describe ".style" do
     it "detects a positional style" do
       expect(described_class.style("Hi {{1}} and {{2}}")).to eq(:positional)

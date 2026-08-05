@@ -66,6 +66,23 @@ RSpec.describe Whatsapp::MessageTemplates::Button::Url do
         .to raise_error(ActiveModel::ValidationError, /must be at the end/)
     end
 
+    # The trailing occurrence satisfies TRAILING_VARIABLE, so only counting
+    # occurrences rather than unique names catches the earlier one.
+    it "rejects the same positional variable repeated" do
+      expect { described_class.new(text: "Shop", url: "https://x.test/{{1}}/details/{{1}}", example: "a") }
+        .to raise_error(ActiveModel::ValidationError, /at most one variable, found 2/)
+    end
+
+    it "rejects the same named variable repeated" do
+      expect { described_class.new(text: "Shop", url: "https://x.test/{{promo}}/d/{{promo}}", example: "a") }
+        .to raise_error(ActiveModel::ValidationError, /at most one variable, found 2/)
+    end
+
+    it "still accepts a single trailing variable" do
+      expect { described_class.new(text: "Shop", url: "https://x.test/orders/{{1}}", example: "a") }
+        .not_to raise_error
+    end
+
     it "requires an example when the url has a variable" do
       expect { described_class.new(text: "Shop", url: "https://x.test/{{1}}") }
         .to raise_error(ActiveModel::ValidationError, /Example can't be blank/)
