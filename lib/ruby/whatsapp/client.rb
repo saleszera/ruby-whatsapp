@@ -21,10 +21,17 @@ module Whatsapp
     # @return [String]
     attr_accessor :phone_id
 
+    # @!attribute [rw] waba_id
+    #   The WhatsApp Business Account ID. Used by account-scoped endpoints such as
+    #   template management, which address the WABA rather than a phone number.
+    #   @return [String, nil]
+    attr_accessor :waba_id
+
     # @param host [String] The API origin (e.g. "https://graph.facebook.com")
     # @param version [String] The API version (e.g. "v24.0")
     # @param api_key [String] The API key for authentication
     # @param phone_id [String] The WhatsApp phone number ID
+    # @param waba_id [String] The WhatsApp Business Account ID
     # @param timeout [Integer] The request timeout in seconds
     # @param logger [Logger, nil] The logger instance for instrumentation (optional)
     def initialize(
@@ -32,6 +39,7 @@ module Whatsapp
       version: Whatsapp.configuration.version,
       api_key: Whatsapp.configuration.api_key,
       phone_id: Whatsapp.configuration.phone_id,
+      waba_id: Whatsapp.configuration.waba_id,
       timeout: DEFAULT_TIMEOUT,
       logger: nil
     )
@@ -39,6 +47,7 @@ module Whatsapp
       @version = version
       @api_key = api_key
       @phone_id = phone_id
+      @waba_id = waba_id
       @timeout = timeout
       @logger = logger
     end
