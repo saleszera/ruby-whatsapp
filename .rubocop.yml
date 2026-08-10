@@ -46,8 +46,9 @@ Style/Documentation:
 Lint/MissingSuper:
   Enabled: false
 
-# `Media#delete` mirrors the REST verb and returns a success boolean; it is not
-# a predicate query.
+# `Media#delete` and `MessageTemplates#update`/`#delete` mirror the REST verb and
+# return a success boolean; they are not predicate queries.
 Naming/PredicateMethod:
   AllowedMethods:
     - delete
+    - update

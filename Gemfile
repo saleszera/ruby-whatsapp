@@ -18,3 +18,4 @@ gem "rubocop"
 gem "rubocop-basic"
 gem "rubocop-rake"
 gem "rubocop-rspec"
+gem "simplecov", require: false

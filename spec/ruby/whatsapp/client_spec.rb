@@ -38,5 +38,13 @@ RSpec.describe Whatsapp::Client do
       expect(client.api_key).to eq("TEST_TOKEN")
       expect(client.phone_id).to eq("PHONE_ID")
     end
+
+    it "reads waba_id from the global configuration" do
+      expect(client.waba_id).to eq("WABA_ID")
+    end
+
+    it "allows waba_id to be overridden per client" do
+      expect(described_class.new(waba_id: "OTHER_WABA").waba_id).to eq("OTHER_WABA")
+    end
   end
 end
