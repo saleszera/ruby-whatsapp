@@ -5,6 +5,9 @@ module Whatsapp
     # Default request timeout in seconds.
     DEFAULT_TIMEOUT = 30
 
+    # Characters that survive a path segment unescaped (RFC 3986 "unreserved").
+    SEGMENT_UNRESERVED = /[^A-Za-z0-9\-._~]/
+
     # @!attribute [rw] host
     # @return [String]
     attr_accessor :host
@@ -69,14 +72,32 @@ module Whatsapp
       end
     end
 
-    # Builds a versioned request path.
+    # Builds a versioned request path. Segments are percent-encoded so a caller-supplied
+    # ID can't inject a query string or redirect to a different Graph edge.
     # @example
     #   path_for(phone_id, "messages") #=> "/v24.0/<phone_id>/messages"
     #   path_for(media_id)             #=> "/v24.0/<media_id>"
     # @param segments [Array<String>] Path segments appended after the version.
     # @return [String] The full request path.
     def path_for(*segments)
-      "/#{[version, *segments].join('/')}"
+      "/#{[version, *segments].map { |segment| encode_segment(segment) }.join('/')}"
+    end
+
+    # Redacts the api_key so it never leaks into logs or console output.
+    # @return [String]
+    def inspect
+      redacted_api_key = api_key.nil? ? "nil" : "[REDACTED]"
+      "#<#{self.class.name} host=#{host.inspect} version=#{version.inspect} " \
+        "api_key=#{redacted_api_key} phone_id=#{phone_id.inspect} waba_id=#{waba_id.inspect}>"
+    end
+
+  private
+
+    # Percent-encodes one path segment, byte-wise so multibyte input is handled correctly.
+    # @param segment [#to_s] The segment to encode.
+    # @return [String]
+    def encode_segment(segment)
+      segment.to_s.b.gsub(SEGMENT_UNRESERVED) { |byte| format("%%%02X", byte.ord) }
     end
   end
 end
