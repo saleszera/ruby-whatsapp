@@ -86,6 +86,7 @@ All message classes validate `:to` (recipient phone number) and implement `seria
 - **SOLID:** Each class has a single responsibility. The message factory, HTTP client, configuration, and instrumentation are deliberately separate. Extend behavior through new classes/modules, not by modifying existing ones.
 - **DRY:** Shared validation, serialization patterns, and HTTP behavior live in base classes (`Messages::Base`, `Interactive::Base`) and mixins. Don't repeat payload-building logic across message types.
 - **KISS:** Keep implementations straightforward. Stub message classes exist intentionally — implement only what the API requires, nothing speculative.
+- **YARD:** Comments on methods and attributes use YARD tags (`@param`, `@return`, `@raise`, `@example`) rather than plain prose — see `response_handling.rb` or `configuration.rb` for the established shape. A one-line description above the tags is fine when the WHY isn't obvious; the tags carry the mechanical detail.
 
 ## Key Details
 

@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-13
+
+- Fix `Client#inspect` leaking the raw `api_key` in its default output — and, through it, any object holding a client (`Media#inspect`, `MessageTemplates#inspect`). Now redacted the same way `Configuration#inspect` already was. If a token may have reached an error tracker or console output that captures local variables, rotate it.
+- Fix `Client#path_for` passing IDs into the request path unencoded. A caller-supplied ID (e.g. `template_id`, `media_id`) could inject a query string or redirect an authenticated request to a different Graph API edge. Segments are now percent-encoded.
+- Fix `Webhook::Signature.valid?` raising `TypeError` instead of returning `false` for a `nil` payload.
+
 ## [0.3.0] - 2026-08-05
 
 - Add template management: `Whatsapp::MessageTemplates` provides full CRUD over the templates on a WhatsApp Business Account — `create`, `list`, `find`, `update`, `delete`, plus `upsert` for multi-language authentication templates and `create_from_library` for Meta's pre-written library. Templates are built from validated value objects (`Template`, `ComponentSet`, `Component::*`, `Button::*`) that enforce Meta's documented rules — name format, character limits, placeholder/example matching, quick-reply contiguity, carousel structure, limited-time-offer restrictions — before a request is made, so a rejection costs nothing instead of a review cycle. Covers standard, authentication/OTP, carousel, limited-time-offer, and library templates.
