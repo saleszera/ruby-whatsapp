@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Ruby ${{ matrix.ruby }}
+    strategy:
+      matrix:
+        ruby:
+          - '3.2'
+          - '3.4'
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - name: Run the default task
+        run: bundle exec rake
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Publish
+
+    # Must match the environment configured on the RubyGems.org trusted publisher.
+    environment: release
+
+    permissions:
+      contents: write # release-gem pushes the version tag when it is not already present
+      id-token: write # OIDC token for RubyGems.org trusted publishing
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
+          bundler-cache: true
+
+      # Runs `bundle exec rake release`: builds into pkg/, tags (skipped when the tag
+      # already exists), and pushes to RubyGems.org over trusted publishing.
+      - name: Push to RubyGems.org
+        uses: rubygems/release-gem@v1
