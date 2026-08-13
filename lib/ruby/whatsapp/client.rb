@@ -5,7 +5,8 @@ module Whatsapp
     # Default request timeout in seconds.
     DEFAULT_TIMEOUT = 30
 
-    # Pattern matching characters that must be percent-escaped in a path segment (everything except RFC 3986 "unreserved").
+    # Characters that must be percent-escaped in a path segment (everything except RFC 3986 "unreserved").
+    SEGMENT_UNRESERVED = /[^A-Za-z0-9\-._~]/
 
     # @!attribute [rw] host
     # @return [String]
