@@ -31,6 +31,44 @@ RSpec.describe Whatsapp::Client do
     it "prefixes the API version for media id paths" do
       expect(client.path_for("MEDIA_ID")).to eq("/v24.0/MEDIA_ID")
     end
+
+    it "leaves real multi-segment calls unchanged" do
+      expect(client.path_for("WABA_ID", "upsert_message_templates")).to eq("/v24.0/WABA_ID/upsert_message_templates")
+    end
+
+    it "percent-encodes a segment that would otherwise inject a query string" do
+      expect(client.path_for("123?fields=x")).to eq("/v24.0/123%3Ffields%3Dx")
+    end
+
+    it "percent-encodes a segment that would otherwise address a different edge" do
+      expect(client.path_for("me/accounts")).to eq("/v24.0/me%2Faccounts")
+    end
+
+    it "neutralizes path traversal" do
+      expect(client.path_for("../../v1/me")).to eq("/v24.0/..%2F..%2Fv1%2Fme")
+    end
+  end
+
+  describe "#inspect" do
+    it "redacts the api_key" do
+      client = described_class.new(api_key: "SECRET_TOKEN")
+
+      expect(client.inspect).to include("api_key=[REDACTED]")
+      expect(client.inspect).not_to include("SECRET_TOKEN")
+    end
+
+    it "shows nil for an unset api_key" do
+      client = described_class.new(api_key: nil)
+
+      expect(client.inspect).to include("api_key=nil")
+    end
+
+    it "does not leak the api_key through objects that hold a client" do
+      client = described_class.new(api_key: "SECRET_TOKEN")
+
+      expect(Whatsapp::Media.new(client:).inspect).not_to include("SECRET_TOKEN")
+      expect(Whatsapp::MessageTemplates.new(client:).inspect).not_to include("SECRET_TOKEN")
+    end
   end
 
   describe "defaults" do
