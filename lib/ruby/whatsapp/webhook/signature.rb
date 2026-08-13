@@ -9,7 +9,7 @@ module Whatsapp
       PREFIX = "sha256="
 
       class << self
-        # @param payload [String] The raw (unparsed) request body.
+        # @param payload [String, nil] The raw (unparsed) request body.
         # @param header [String, nil] The `X-Hub-Signature-256` header value.
         # @param app_secret [String, nil] The secret to verify against. Defaults to the
         #   globally configured secret; pass an explicit value for multi-tenant apps where
