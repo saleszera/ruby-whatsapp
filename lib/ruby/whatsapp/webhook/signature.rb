@@ -16,6 +16,7 @@ module Whatsapp
         #   each account has its own Meta App (and therefore its own secret).
         # @return [Boolean] Whether the header matches the computed signature.
         def valid?(payload:, header:, app_secret: Whatsapp.configuration.app_secret)
+          return false if payload.nil?
           return false if header.nil? || header.empty?
           return false if app_secret.nil? || app_secret.empty?
 

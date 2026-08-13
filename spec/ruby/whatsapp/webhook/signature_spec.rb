@@ -32,6 +32,15 @@ RSpec.describe Whatsapp::Webhook::Signature do
       expect(described_class.valid?(payload:, header: signature_for(payload, "MY_SECRET"))).to be(false)
     end
 
+    it "returns false when the payload is nil, without raising" do
+      Whatsapp.configuration.app_secret = "MY_SECRET"
+
+      result = nil
+      expect { result = described_class.valid?(payload: nil, header: signature_for("", "MY_SECRET")) }
+        .not_to raise_error
+      expect(result).to be(false)
+    end
+
     it "accepts an explicit app_secret override, ignoring global configuration" do
       Whatsapp.configuration.app_secret = "GLOBAL_SECRET"
 
