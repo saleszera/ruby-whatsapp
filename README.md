@@ -31,6 +31,7 @@ A small, dependency-light Ruby client for the [Meta WhatsApp Cloud API](https://
 - [Media](#media)
 - [Managing Templates](#managing-templates)
 - [Managing Subscribed Apps](#managing-subscribed-apps)
+- [Registering Business Phone Numbers](#registering-business-phone-numbers)
 - [Webhooks](#webhooks)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -91,6 +92,7 @@ response.messages.first.id # => "wamid.HBgLMTU1NTU1NTU1NTUV..."
 - **Structured response parsing** — `Whatsapp::Messages::Response` exposes typed `#contacts` and `#messages` instead of raw JSON.
 - **Template management** — create, list, edit and delete the message templates on your WhatsApp Business Account from Ruby, with Meta's documented rules checked client-side so a rejection costs a validation error instead of a 24-hour review cycle.
 - **Subscribed apps management** — subscribe or unsubscribe this app from a WhatsApp Business Account's webhook notifications, and list who's currently subscribed, straight from Ruby.
+- **Business phone number registration** — register or deregister a phone number with Cloud API, with the 6-digit two-step verification PIN and local-storage region checked client-side before any request is made.
 - **Inbound webhook parsing** — a typed object tree for all 19 documented Meta notification field types, plus signature verification.
 
 ## Sending Messages
@@ -619,6 +621,65 @@ Every action accepts an optional `client:` keyword (defaults to a new
 `Whatsapp::Client` built from `Whatsapp.configuration`), and raises
 `Whatsapp::SubscribedApp::Error` if no `waba_id` is configured or the API rejects the
 request.
+
+## Registering Business Phone Numbers
+
+A business phone number is unusable with Cloud API until it is **registered** —
+registration is the prerequisite that makes sending, media, and templates work for that
+number at all. `Whatsapp::BusinessPhoneNumber` wraps the two endpoints that flip this
+switch: `Register` and `Deregister`.
+
+This addresses your **phone number** (`phone_id`, not `waba_id`), like
+[messages](#sending-messages) and [media](#media), and needs the
+`whatsapp_business_messaging` and `whatsapp_business_management` permissions.
+
+```ruby
+Whatsapp.configure do |config|
+  config.api_key  = ENV["WHATSAPP_API_KEY"]
+  config.phone_id = ENV["WHATSAPP_PHONE_ID"]
+end
+
+Whatsapp::BusinessPhoneNumber::Register.call(pin: "212834")   # register with your two-step verification PIN
+Whatsapp::BusinessPhoneNumber::Deregister.call                # release the number from Cloud API
+```
+
+### Registering
+
+```ruby
+result = Whatsapp::BusinessPhoneNumber::Register.call(pin: "212834")
+result.success   # => true
+```
+
+`pin` must be exactly 6 digits — the existing two-step verification PIN if one is
+already set, otherwise the PIN to set. An invalid PIN raises
+`ActiveModel::ValidationError` before any request is made.
+
+Pass `data_localization_region` to enable local storage in one of Meta's supported
+regions (`AU ID IN JP SG KR DE CH GB BR BH ZA AE CA`):
+
+```ruby
+Whatsapp::BusinessPhoneNumber::Register.call(pin: "212834", data_localization_region: "CH")
+```
+
+### Deregistering
+
+```ruby
+Whatsapp::BusinessPhoneNumber::Deregister.call.success   # => true
+```
+
+Deregistering makes the number unusable with Cloud API and disables local storage — it
+does **not** delete the number or its message history. A number in use with both Cloud
+API and the WhatsApp Business app cannot be deregistered.
+
+Every action accepts an optional `client:` keyword (defaults to a new
+`Whatsapp::Client` built from `Whatsapp.configuration` — pass one with a different
+`phone_id:` to target another number), and raises
+`Whatsapp::BusinessPhoneNumber::Error` if no `phone_id` is configured or the API rejects
+the request.
+
+> **Rate limit:** both endpoints are capped at 10 requests per business number in a
+> 72-hour moving window; exceeding it returns error `133016` and blocks the operation
+> for the next 72 hours.
 
 ## Webhooks
 
