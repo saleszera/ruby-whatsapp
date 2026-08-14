@@ -46,6 +46,7 @@ This is a Ruby gem (`ruby-whatsapp`) providing a client for the Meta WhatsApp Cl
 - `Whatsapp::Messages` — factory class. Accepts `kind` (e.g., `:text`, `:template`), resolves the appropriate subclass via `MessageKinds.const_get(kind.upcase)`, instantiates it, and exposes `send!`.
 - `Whatsapp::Media` — handles media upload, URL retrieval, download, and deletion via the API.
 - `Whatsapp::MessageTemplates` — full CRUD for the templates on a WhatsApp Business Account (create/list/find/update/delete, plus `upsert` and `create_from_library`). Addresses `waba_id`, not `phone_id`.
+- `Whatsapp::SubscribedApp` — subscribes/unsubscribes this app from a WABA's webhook notifications and lists who's subscribed, via `List`/`Subscribe`/`Unsubscribe`, one class per action. Addresses `waba_id`, like `MessageTemplates`.
 
 **Message class hierarchy:**
 
@@ -73,6 +74,12 @@ All message classes validate `:to` (recipient phone number) and implement `seria
 - Registry dispatch via frozen `Component::TYPES` / `Button::TYPES` (mirrors `Messages::KINDS`), never `const_get` on caller input. Only component and button types with a published Meta schema are registered.
 - Four response shapes, so `Response::{Created,Node,Collection}` rather than one class; `update`/`delete` return a plain boolean. `Response::Node#components` stays raw hashes on purpose — write-side validators must not run over Meta's echoed payloads.
 - `docs/template-management-api.md` holds the full API research, including what is deliberately unimplemented (Resumable Upload for media handles, undocumented button/component types) and the four details unverified against a live WABA.
+
+**Subscribed apps:** `Whatsapp::SubscribedApp` wraps the `subscribed_apps` edge — the switch that turns a WABA's webhook delivery on or off, as opposed to `Whatsapp::Webhook`, which only deserializes notifications once Meta is already sending them. See `lib/ruby/whatsapp/subscribed_app/CLAUDE.md`; in short:
+
+- Three independent, unrelated actions (no shared identity/validation the way `MessageTemplates`' CRUD verbs share a template concept), so each gets its own class rather than one class with several methods: `List` (GET), `Subscribe` (POST), `Unsubscribe` (DELETE). Every action is a stateless class-level `.call`, mirroring `Webhook::Verification.call`/`Webhook::Signature.valid?` rather than `Media`/`MessageTemplates`'s instance-holds-client shape.
+- `Transport` is `extend`ed by all three action classes for the one thing they share: building the WABA-scoped path and guarding on `client.waba_id`.
+- Three response shapes, so `Response::{Collection,Subscription,Unsubscription}` rather than one class; `Response::App` (the flattened `whatsapp_business_api_data`) is composed by both `Collection` and `Subscription` rather than duplicated.
 
 **Webhooks (inbound):** `Whatsapp::Webhook` deserializes Meta's incoming webhook notifications — the opposite direction from everything above. See `lib/ruby/whatsapp/webhook/CLAUDE.md` for the full dispatch-table conventions and field reference; in short:
 

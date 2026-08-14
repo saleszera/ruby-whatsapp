@@ -18,6 +18,7 @@ unless ENV["COVERAGE"] == "false"
     add_group "Message Templates", "lib/ruby/whatsapp/message_templates"
     add_group "Messages", "lib/ruby/whatsapp/messages"
     add_group "Webhook", "lib/ruby/whatsapp/webhook"
+    add_group "Subscribed Apps", "lib/ruby/whatsapp/subscribed_app"
     add_group "Media", "lib/ruby/whatsapp/media.rb"
     add_group "Core", %w[
       lib/ruby/whatsapp/client.rb
