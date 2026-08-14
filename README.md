@@ -30,6 +30,7 @@ A small, dependency-light Ruby client for the [Meta WhatsApp Cloud API](https://
 - [Handling Responses](#handling-responses)
 - [Media](#media)
 - [Managing Templates](#managing-templates)
+- [Managing Subscribed Apps](#managing-subscribed-apps)
 - [Webhooks](#webhooks)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -89,6 +90,7 @@ response.messages.first.id # => "wamid.HBgLMTU1NTU1NTU1NTUV..."
 - **Hardened media downloads** — `Media#download` refuses to attach the bearer token to non-HTTPS URLs or hosts outside an allowlist, so a token can never leak to an attacker-influenced URL.
 - **Structured response parsing** — `Whatsapp::Messages::Response` exposes typed `#contacts` and `#messages` instead of raw JSON.
 - **Template management** — create, list, edit and delete the message templates on your WhatsApp Business Account from Ruby, with Meta's documented rules checked client-side so a rejection costs a validation error instead of a 24-hour review cycle.
+- **Subscribed apps management** — subscribe or unsubscribe this app from a WhatsApp Business Account's webhook notifications, and list who's currently subscribed, straight from Ruby.
 - **Inbound webhook parsing** — a typed object tree for all 19 documented Meta notification field types, plus signature verification.
 
 ## Sending Messages
@@ -555,6 +557,68 @@ templates.create_from_library(
 - **Review outcomes arrive by webhook**, not by polling: see
   `message_template_status_update` and friends under [Webhooks](#webhooks).
 - Text containing `#{{1}}` needs single quotes in Ruby, or `#{` starts interpolation.
+
+## Managing Subscribed Apps
+
+Before your app receives any [webhook](#webhooks) notifications for a WhatsApp
+Business Account, it needs to be subscribed to it. `Whatsapp::SubscribedApp` wraps the
+`subscribed_apps` edge: one class per action, since — unlike templates — these three
+actions don't share an identity or validation rules to justify one combined class.
+
+This addresses your **WhatsApp Business Account** (`waba_id`, not `phone_id`) and needs
+the `whatsapp_business_management` permission, same as [template management](#managing-templates).
+
+```ruby
+Whatsapp.configure do |config|
+  config.api_key = ENV["WHATSAPP_API_KEY"]
+  config.waba_id = ENV["WHATSAPP_WABA_ID"]
+end
+
+Whatsapp::SubscribedApp::Subscribe.call                         # subscribe this app
+Whatsapp::SubscribedApp::List.call.map(&:name)                  # => ["My App"]
+Whatsapp::SubscribedApp::Unsubscribe.call                       # stop all webhook delivery
+```
+
+### Subscribing
+
+```ruby
+result = Whatsapp::SubscribedApp::Subscribe.call
+result.success       # => true
+result.map(&:name)   # => ["My App"] — every app now subscribed, Meta's own echo
+```
+
+Tech Providers routing several WABAs' notifications to different callback URLs pass an
+override instead of relying on the one callback URL configured on the app itself:
+
+```ruby
+Whatsapp::SubscribedApp::Subscribe.call(
+  override_callback_uri: "https://example.com/webhooks/acme_corp",
+  verify_token: "a-per-account-secret"
+)
+```
+
+### Listing
+
+```ruby
+apps = Whatsapp::SubscribedApp::List.call
+apps.map(&:name)          # Collection is Enumerable
+apps.first.link           # => "https://www.facebook.com/games/?app_id=..."
+
+Whatsapp::SubscribedApp::List.call(fields: %w[id name])  # restrict the fields returned
+```
+
+### Unsubscribing
+
+```ruby
+Whatsapp::SubscribedApp::Unsubscribe.call.success   # => true
+```
+
+Stops all webhook deliveries for this WABA immediately.
+
+Every action accepts an optional `client:` keyword (defaults to a new
+`Whatsapp::Client` built from `Whatsapp.configuration`), and raises
+`Whatsapp::SubscribedApp::Error` if no `waba_id` is configured or the API rejects the
+request.
 
 ## Webhooks
 
