@@ -23,8 +23,8 @@ module Whatsapp
         ALL = [SMS, VOICE].freeze
 
         # Normalizes caller input to a canonical uppercase code method.
-        # Unrecognized values are returned untouched so the inclusion validator can
-        # report them.
+        # Unrecognized values are returned as a string (preserving the original
+        # casing) so the inclusion validator can reject them.
         # @param value [String, Symbol, nil]
         # @return [String, nil]
         def self.normalize(value)
