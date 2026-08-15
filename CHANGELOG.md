@@ -1,5 +1,6 @@
-## [Unreleased]
+## [0.4.0] - 2026-08-14
 
+- Add subscribed apps management: `Whatsapp::SubscribedApp::List`, `::Subscribe`, and `::Unsubscribe` wrap the `subscribed_apps` edge — the switch that turns a WABA's webhook delivery on or off, as opposed to `Whatsapp::Webhook`, which only deserializes notifications once Meta is already sending them. Responses expose `Collection`, `Subscription`, and `Unsubscription`, each composed from a shared `App` value object.
 - Add business phone number registration: `Whatsapp::BusinessPhoneNumber::Register` and `::Deregister` wrap the two endpoints that make a phone number usable — or not — with Cloud API. `Register` validates the 6-digit two-step verification PIN and the `data_localization_region` locally before any request is made.
 - Add the phone number verification flow that precedes registration: `Whatsapp::BusinessPhoneNumber::RequestCode` sends a verification code by SMS or voice call, and `::VerifyCode` confirms it, completing the `RequestCode` → `VerifyCode` → `Register` onboarding sequence. `Response` now carries an optional `id`, returned by `VerifyCode`.
 
