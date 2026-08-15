@@ -4,8 +4,8 @@ module Whatsapp
   module BusinessPhoneNumber
     # The one piece shared by {Register}, {Deregister}, {RequestCode}, and
     # {VerifyCode}: all four address the same phone-number-scoped resource, differing
-    # only in edge name and body. Extended (not included) since those classes are
-    # class-method-only.
+    # only in edge name and body. Extended (not included) because {#edge_path} is used
+    # from class-level `.call` methods (as a private class method).
     module Transport
     private
 
