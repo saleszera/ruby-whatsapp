@@ -26,7 +26,7 @@ Source:
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/phone-number-verification-request-code-api
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/verify-code-api
 
-Full API research and design rationale: `docs/business-phone-number-api.md`.
+Full API research and design rationale: see the Meta docs links above.
 
 ## Why this follows `SubscribedApp`, with two exceptions
 
