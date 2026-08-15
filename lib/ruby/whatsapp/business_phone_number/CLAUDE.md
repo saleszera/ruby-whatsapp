@@ -15,7 +15,7 @@ Source:
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/registration
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/phone-number-deregister-api
 
-Full API research and design rationale: `docs/business-phone-number-api.md`.
+Full API research and design rationale: see the Meta docs links above.
 
 ## Why this follows `SubscribedApp`, with two exceptions
 
