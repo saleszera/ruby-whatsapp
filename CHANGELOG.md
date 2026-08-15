@@ -1,6 +1,7 @@
 ## [Unreleased]
 
 - Add business phone number registration: `Whatsapp::BusinessPhoneNumber::Register` and `::Deregister` wrap the two endpoints that make a phone number usable — or not — with Cloud API. `Register` validates the 6-digit two-step verification PIN and the `data_localization_region` locally before any request is made.
+- Add the phone number verification flow that precedes registration: `Whatsapp::BusinessPhoneNumber::RequestCode` sends a verification code by SMS or voice call, and `::VerifyCode` confirms it, completing the `RequestCode` → `VerifyCode` → `Register` onboarding sequence. `Response` now carries an optional `id`, returned by `VerifyCode`.
 
 ## [0.3.1] - 2026-08-13
 

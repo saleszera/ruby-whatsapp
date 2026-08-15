@@ -92,7 +92,7 @@ response.messages.first.id # => "wamid.HBgLMTU1NTU1NTU1NTUV..."
 - **Structured response parsing** — `Whatsapp::Messages::Response` exposes typed `#contacts` and `#messages` instead of raw JSON.
 - **Template management** — create, list, edit and delete the message templates on your WhatsApp Business Account from Ruby, with Meta's documented rules checked client-side so a rejection costs a validation error instead of a 24-hour review cycle.
 - **Subscribed apps management** — subscribe or unsubscribe this app from a WhatsApp Business Account's webhook notifications, and list who's currently subscribed, straight from Ruby.
-- **Business phone number registration** — register or deregister a phone number with Cloud API, with the 6-digit two-step verification PIN and local-storage region checked client-side before any request is made.
+- **Business phone number onboarding** — request and verify a phone number's verification code, then register or deregister it with Cloud API, with the 6-digit two-step verification PIN and local-storage region checked client-side before any request is made.
 - **Inbound webhook parsing** — a typed object tree for all 19 documented Meta notification field types, plus signature verification.
 
 ## Sending Messages
@@ -626,8 +626,15 @@ request.
 
 A business phone number is unusable with Cloud API until it is **registered** —
 registration is the prerequisite that makes sending, media, and templates work for that
-number at all. `Whatsapp::BusinessPhoneNumber` wraps the two endpoints that flip this
-switch: `Register` and `Deregister`.
+number at all. `Whatsapp::BusinessPhoneNumber` wraps all four endpoints in that
+onboarding flow:
+
+```
+RequestCode  ->  VerifyCode  ->  Register            (onboarding)
+(send OTP)       (confirm it)    (activate on Cloud API)
+
+Deregister                                            (the reverse switch)
+```
 
 This addresses your **phone number** (`phone_id`, not `waba_id`), like
 [messages](#sending-messages) and [media](#media), and needs the
@@ -639,8 +646,28 @@ Whatsapp.configure do |config|
   config.phone_id = ENV["WHATSAPP_PHONE_ID"]
 end
 
+Whatsapp::BusinessPhoneNumber::RequestCode.call(code_method: "SMS", language: "en_US")  # send an OTP
+Whatsapp::BusinessPhoneNumber::VerifyCode.call(code: "123456")                         # confirm it
 Whatsapp::BusinessPhoneNumber::Register.call(pin: "212834")   # register with your two-step verification PIN
 Whatsapp::BusinessPhoneNumber::Deregister.call                # release the number from Cloud API
+```
+
+### Requesting a verification code
+
+```ruby
+Whatsapp::BusinessPhoneNumber::RequestCode.call(code_method: "SMS", language: "en_US").success   # => true
+```
+
+`code_method` must be `"SMS"` or `"VOICE"`; `language` is the locale for the
+verification message (e.g. `"en_US"`). Both are required — an invalid or missing value
+raises `ActiveModel::ValidationError` before any request is made.
+
+### Verifying the code
+
+```ruby
+result = Whatsapp::BusinessPhoneNumber::VerifyCode.call(code: "123456")
+result.success   # => true
+result.id        # => the phone number ID, when Meta returns one
 ```
 
 ### Registering
@@ -677,9 +704,10 @@ Every action accepts an optional `client:` keyword (defaults to a new
 `Whatsapp::BusinessPhoneNumber::Error` if no `phone_id` is configured or the API rejects
 the request.
 
-> **Rate limit:** both endpoints are capped at 10 requests per business number in a
-> 72-hour moving window; exceeding it returns error `133016` and blocks the operation
-> for the next 72 hours.
+> **Rate limits:** `Register`/`Deregister` are capped at 10 requests per business number
+> in a 72-hour moving window; exceeding it returns error `133016` and blocks the
+> operation for the next 72 hours. `RequestCode`/`VerifyCode` document only "standard
+> Graph API rate limits" plus possible additional throttling, with no published number.
 
 ## Webhooks
 

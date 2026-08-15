@@ -15,5 +15,18 @@ RSpec.describe Whatsapp::BusinessPhoneNumber::Response do
     it "tolerates a nil payload" do
       expect(described_class.deserialize(nil).success).to be(false)
     end
+
+    it "reads the id when present" do
+      expect(described_class.deserialize("success" => true, "id" => "106540352242922").id)
+        .to eq("106540352242922")
+    end
+
+    it "leaves id nil when absent, as register/deregister responses never send one" do
+      expect(described_class.deserialize("success" => true).id).to be_nil
+    end
+
+    it "leaves id nil for a nil payload" do
+      expect(described_class.deserialize(nil).id).to be_nil
+    end
   end
 end

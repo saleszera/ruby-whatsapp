@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 module Whatsapp
-  # Registers or deregisters a business phone number with Cloud API.
+  # Onboards and deboards a business phone number with Cloud API: requesting and
+  # verifying a phone number's verification code, then registering or deregistering it.
   #
   # This is the switch that makes a phone number usable — or not — with Cloud API in
   # the first place. It is a different concern from {Whatsapp::SubscribedApp}, which
@@ -9,6 +10,9 @@ module Whatsapp
   # module is per phone number and is a prerequisite for messaging itself, not just
   # for notifications. Addresses `phone_id`, like {Whatsapp::Media} and
   # {Whatsapp::Messages}, not `waba_id`.
+  #
+  # The full flow, in order: {RequestCode} -> {VerifyCode} -> {Register}, with
+  # {Deregister} as the reverse switch.
   # See `lib/ruby/whatsapp/business_phone_number/CLAUDE.md` and
   # `docs/business-phone-number-api.md`.
   # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/registration
