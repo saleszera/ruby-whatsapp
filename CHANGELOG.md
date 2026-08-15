@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- Add business phone number registration: `Whatsapp::BusinessPhoneNumber::Register` and `::Deregister` wrap the two endpoints that make a phone number usable — or not — with Cloud API. `Register` validates the 6-digit two-step verification PIN and the `data_localization_region` locally before any request is made.
+
 ## [0.3.1] - 2026-08-13
 
 - Fix `Client#inspect` leaking the raw `api_key` in its default output — and, through it, any object holding a client (`Media#inspect`, `MessageTemplates#inspect`). Now redacted the same way `Configuration#inspect` already was. If a token may have reached an error tracker or console output that captures local variables, rotate it.
