@@ -44,8 +44,10 @@ and vice versa. The only genuinely shared thing is `Utils::LanguageCodes`. Do no
 to unify them; one class cannot serialize two incompatible shapes without becoming a
 conditional mess.
 
-Full API research, including everything deliberately left unimplemented, is in
-[`docs/template-management-api.md`](../../../../docs/template-management-api.md).
+The user-facing reference lives in
+[`docs/message_templates/`](../../../../docs/message_templates/README.md) — one page per
+template kind, plus `components.md` and `responses.md`. Everything deliberately left
+unimplemented is listed under "Not implemented" below.
 
 ## Architecture
 
@@ -409,7 +411,7 @@ the outcome arrives via webhook, already modelled elsewhere in this gem — poll
 
 ## Not implemented
 
-Deliberate, per the confidence tiers in `docs/template-management-api.md`:
+Deliberate — only types with a published Meta field reference get a class:
 
 - **Media upload.** Media headers take a `header_handle` the caller already has. The
   Resumable Upload API that produces one needs an `app_id` (absent from

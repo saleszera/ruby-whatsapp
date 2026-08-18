@@ -18,11 +18,8 @@ COVERAGE=false bundle exec rspec spec/ruby/whatsapp_spec.rb
 # Linting
 bundle exec rubocop
 
-# Interactive console
+# Interactive console (bin/ holds only `console` and `setup`)
 bin/console
-
-# Live smoke test against a real WABA (creates and deletes a throwaway template)
-WHATSAPP_API_KEY=... WHATSAPP_WABA_ID=... WHATSAPP_PHONE_ID=... bin/dev
 ```
 
 **Coverage:** SimpleCov is configured in `spec/spec_helper.rb` and must stay above the
@@ -43,7 +40,7 @@ This is a Ruby gem (`ruby-whatsapp`) providing a client for the Meta WhatsApp Cl
 - `Whatsapp::Configuration` — holds `host`, `version`, `api_key`, `phone_id`, `waba_id`. Defaults to `https://graph.facebook.com` / `v24.0`.
 - `Whatsapp::Client` — wraps `HTTP.persistent` for connection reuse. Accepts optional instrumentation and timeout. All API requests go through here.
 - `Whatsapp::Instrumentation` — middleware-style logger for HTTP requests/responses. Injected into `Client` at initialization.
-- `Whatsapp::Messages` — factory class. Accepts `kind` (e.g., `:text`, `:template`), resolves the appropriate subclass via `MessageKinds.const_get(kind.upcase)`, instantiates it, and exposes `send!`.
+- `Whatsapp::Messages` — factory class. Accepts `kind` (e.g., `:text`, `:template`), resolves the appropriate subclass through the frozen `KINDS` registry (never `const_get` on caller input), instantiates it, and exposes `send!`. Each entry in `KINDS` also gets a generated `send_<kind>!` class method.
 - `Whatsapp::Media` — handles media upload, URL retrieval, download, and deletion via the API.
 - `Whatsapp::MessageTemplates` — full CRUD for the templates on a WhatsApp Business Account (create/list/find/update/delete, plus `upsert` and `create_from_library`). Addresses `waba_id`, not `phone_id`.
 - `Whatsapp::SubscribedApp` — subscribes/unsubscribes this app from a WABA's webhook notifications and lists who's subscribed, via `List`/`Subscribe`/`Unsubscribe`, one class per action. Addresses `waba_id`, like `MessageTemplates`.
@@ -53,14 +50,19 @@ This is a Ruby gem (`ruby-whatsapp`) providing a client for the Meta WhatsApp Cl
 
 ```
 Messages::Base (ActiveModel::Validations, abstract serialize method)
-  ├── Messages::Text
-  ├── Messages::Video
-  ├── Messages::Template (with Component, Language, Parameter sub-objects)
-  ├── Messages::Interactive::Base
-  │   ├── ReplyButtons, ListButtons, MediaCarousel, ProductCarousel, UrlButton
-  └── [stub classes]: Image, Audio, Document, Contacts, Sticker, Reaction,
-                      Address, Location, LocationRequest, MessageWithLink
+  ├── Text, Image, Video, Audio, Document, Sticker, Reaction, Location
+  ├── Contacts (with Contact, Name, Phone, Email, Address, Org, Url sub-objects)
+  ├── Address, LocationRequest        (serialize as type: "interactive" on the wire)
+  ├── Template (with Component, Language, Parameter sub-objects)
+  └── Interactive                     (one class, dispatching on ACTION_TYPES)
+        └── Interactive::Base
+              ├── ReplyButtons, ListButtons, UrlButton
+              └── MediaCarousel, ProductCarousel
+
+MarkMessageAsRead                     (no Base, no envelope — see messages/CLAUDE.md)
 ```
+
+There are **no stub classes** — every kind registered in `KINDS` is fully implemented.
 
 All message classes validate `:to` (recipient phone number) and implement `serialize` to build the API payload hash.
 
@@ -74,7 +76,7 @@ All message classes validate `:to` (recipient phone number) and implement `seria
 - `Template` / `LibraryTemplate` own template identity; `ComponentSet` owns every rule that spans more than one component (a footer being forbidden alongside a limited-time offer, a carousel implying MARKETING); each `Component`/`Button` class validates only itself. `ComponentSet` is separate so `#update`, which replaces components wholesale without a name or language, can reuse exactly those checks.
 - Registry dispatch via frozen `Component::TYPES` / `Button::TYPES` (mirrors `Messages::KINDS`), never `const_get` on caller input. Only component and button types with a published Meta schema are registered.
 - Four response shapes, so `Response::{Created,Node,Collection}` rather than one class; `update`/`delete` return a plain boolean. `Response::Node#components` stays raw hashes on purpose — write-side validators must not run over Meta's echoed payloads.
-- `docs/template-management-api.md` holds the full API research, including what is deliberately unimplemented (Resumable Upload for media handles, undocumented button/component types) and the four details unverified against a live WABA.
+- `docs/message_templates/` holds the user-facing reference — one page per template kind, plus `components.md` and `responses.md`. The full API research, including what is deliberately unimplemented (Resumable Upload for media handles, undocumented button/component types) and the four details unverified against a live WABA, lives in `lib/ruby/whatsapp/message_templates/CLAUDE.md`.
 
 **Subscribed apps:** `Whatsapp::SubscribedApp` wraps the `subscribed_apps` edge — the switch that turns a WABA's webhook delivery on or off, as opposed to `Whatsapp::Webhook`, which only deserializes notifications once Meta is already sending them. See `lib/ruby/whatsapp/subscribed_app/CLAUDE.md`; in short:
 
@@ -82,7 +84,7 @@ All message classes validate `:to` (recipient phone number) and implement `seria
 - `Transport` is `extend`ed by all three action classes for the one thing they share: building the WABA-scoped path and guarding on `client.waba_id`.
 - Three response shapes, so `Response::{Collection,Subscription,Unsubscription}` rather than one class; `Response::App` (the flattened `whatsapp_business_api_data`) is composed by both `Collection` and `Subscription` rather than duplicated.
 
-**Business phone numbers:** `Whatsapp::BusinessPhoneNumber` wraps a phone number's whole onboarding path with Cloud API — `RequestCode` → `VerifyCode` → `Register`, plus `Deregister` as the reverse switch — the prerequisite that makes sending, media, and templates work for it at all, as opposed to `Whatsapp::SubscribedApp`, which turns webhook delivery on/off for a whole WABA. See `lib/ruby/whatsapp/business_phone_number/CLAUDE.md` and `docs/business-phone-number-api.md`; in short:
+**Business phone numbers:** `Whatsapp::BusinessPhoneNumber` wraps a phone number's whole onboarding path with Cloud API — `RequestCode` → `VerifyCode` → `Register`, plus `Deregister` as the reverse switch — the prerequisite that makes sending, media, and templates work for it at all, as opposed to `Whatsapp::SubscribedApp`, which turns webhook delivery on/off for a whole WABA. See `lib/ruby/whatsapp/business_phone_number/CLAUDE.md` and `docs/business_phone_number/README.md`; in short:
 
 - One class per action like `SubscribedApp`, but each (except `Deregister`) a validated instance with a public `#serialize` (plus a class-level `.call`) rather than a pure class method — Meta documents real client-side rules (`register`'s 6-digit PIN and region codes, `request_code`'s closed set of delivery methods), and a rejected attempt still costs against the rate limit each edge documents.
 - One `Response` class, not a `Response::` namespace — all four endpoints return the same `{success}` shape, `VerifyCode` additionally an optional `id`, unlike `SubscribedApp`'s three genuinely different shapes.
@@ -107,5 +109,5 @@ All message classes validate `:to` (recipient phone number) and implement `seria
 - Ruby version: 3.4.7 (`.ruby-version`)
 - RuboCop config inherits from `rubocop-basic`; complexity cops (ABC, Cyclomatic, etc.) are disabled
 - Tests use RSpec with Faker and WebMock (`WebMock.disable_net_connect!` — every HTTP interaction must be stubbed). No Factory Bot or Shoulda Matchers; write plain `let`/`subject` specs with `stub_request`
-- CI runs `bundle exec rake` (tests + linting) on Ruby 3.2.2 via GitHub Actions
-- Many message types are stubs — only `Text`, `Video`, `Template`, and `Interactive` variants have full implementations
+- CI runs `bundle exec rake` (tests + linting) on a Ruby 3.2 / 3.4 matrix via GitHub Actions
+- Every message kind registered in `KINDS` is fully implemented — there are no stub classes
