@@ -14,7 +14,7 @@ module Whatsapp
   # The full flow, in order: {RequestCode} -> {VerifyCode} -> {Register}, with
   # {Deregister} as the reverse switch.
   # See `lib/ruby/whatsapp/business_phone_number/CLAUDE.md` and
-  # `docs/business-phone-number-api.md`.
+  # `docs/business_phone_number/README.md`.
   # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/registration
   module BusinessPhoneNumber
     class Error < Whatsapp::Error; end

@@ -166,5 +166,5 @@ Whatsapp::BusinessPhoneNumber::Deregister.call.success
 - [ ] Add the attribute to the relevant action class (or `Response`), with a
       `# @!attribute` tag and any validation Meta documents as a client-side rule
 - [ ] Thread it through that class's `.call`/`#serialize`
-- [ ] Add a row/example to this file and to `docs/business-phone-number-api.md`
+- [ ] Add a row/example to this file and to `docs/business_phone_number/README.md`
 - [ ] `bundle exec rake` green before committing
