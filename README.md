@@ -16,37 +16,41 @@
 
 Every message type the Cloud API supports — text, media, location, contacts,
 templates, and the full family of interactive messages — is modeled as its own
-`ActiveModel`-validated Ruby class, so a malformed payload raises **locally** instead
-of round-tripping to Meta's servers to come back as an opaque `#131009`.
+`ActiveModel`-validated Ruby class. A malformed payload raises **in your own process,
+naming the field that's wrong**, instead of travelling to Meta and coming back as
+error `131009` — the catch-all code the Cloud API returns for a too-long caption, an
+unsupported message type, a bad message ID, and a dozen other unrelated mistakes.
+
+```ruby
+# The caption limit is 1024 characters. This never leaves your machine 🛑
+Whatsapp::Messages.send_image!(to: "+15551234567", link: photo_url, caption: "x" * 2000)
+# => ActiveModel::ValidationError: Caption is too long (maximum is 1024 characters)
+```
 
 Beyond sending, the gem covers the whole surface: media upload and download, template
 creation and management, inbound webhook parsing, webhook subscription, and phone
 number onboarding.
 
-```ruby
-Whatsapp::Messages.send_text!(to: "+15551234567", body: "Hello from ruby-whatsapp!")
-```
-
 ## Table of Contents
 
-- [Why ruby-whatsapp](#why-ruby-whatsapp)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Quick Start](#quick-start)
-- [Documentation](#documentation)
-- [Sending Messages](#sending-messages)
-- [Managing Templates](#managing-templates)
-- [Webhooks](#webhooks)
-- [Media](#media)
-- [Subscribed Apps](#subscribed-apps)
-- [Business Phone Numbers](#business-phone-numbers)
-- [Errors](#errors)
-- [Compatibility](#compatibility)
-- [Development](#development)
-- [Contributing](#contributing)
-- [License](#license)
+- [✨ Why ruby-whatsapp](#-why-ruby-whatsapp)
+- [📦 Installation](#-installation)
+- [🔧 Configuration](#-configuration)
+- [🚀 Quick Start](#-quick-start)
+- [📚 Documentation](#-documentation)
+- [💬 Sending Messages](#-sending-messages)
+- [📋 Managing Templates](#-managing-templates)
+- [🔔 Webhooks](#-webhooks)
+- [📷 Media](#-media)
+- [🔌 Subscribed Apps](#-subscribed-apps)
+- [📞 Business Phone Numbers](#-business-phone-numbers)
+- [🚨 Errors](#-errors)
+- [🧩 Compatibility](#-compatibility)
+- [🔨 Development](#-development)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
 
-## Why ruby-whatsapp
+## ✨ Why ruby-whatsapp
 
 - **Typed, validated message classes** for every Cloud API message kind — invalid
   payloads raise before any HTTP request is made, with the failing attribute named.
@@ -68,7 +72,7 @@ Whatsapp::Messages.send_text!(to: "+15551234567", body: "Hello from ruby-whatsap
 - **Four runtime dependencies**, no Rails requirement. Rails integration activates
   itself when Rails is present.
 
-## Installation
+## 📦 Installation
 
 ```ruby
 # Gemfile
@@ -85,7 +89,7 @@ Or standalone:
 gem install ruby-whatsapp
 ```
 
-## Configuration
+## 🔧 Configuration
 
 ```ruby
 Whatsapp.configure do |config|
@@ -120,7 +124,7 @@ and `Client#inspect`, so they will not leak into logs or error reports.
 
 → **[Full configuration reference](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/configuration.md)**
 
-## Quick Start
+## 🚀 Quick Start
 
 ```ruby
 require "ruby/whatsapp"
@@ -136,7 +140,7 @@ response.messages.first.id     # => "wamid.HBgLMTU1NTU1NTU1NTUV..."
 response.contacts.first.wa_id  # => "15551234567"
 ```
 
-## Documentation
+## 📚 Documentation
 
 | Area | What it covers |
 | --- | --- |
@@ -151,7 +155,7 @@ response.contacts.first.wa_id  # => "15551234567"
 
 Or start at the [documentation index](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/README.md).
 
-## Sending Messages
+## 💬 Sending Messages
 
 Every registered kind gets its own `Whatsapp::Messages.send_<kind>!` class method:
 
@@ -188,7 +192,7 @@ typed `#contacts` and `#messages`. Invalid input raises
 
 → **[Sending messages](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/messages/README.md)**
 
-## Managing Templates
+## 📋 Managing Templates
 
 Sending a template requires one that already exists and has been approved by Meta.
 `Whatsapp::MessageTemplates` creates and manages those, so they live in your codebase
@@ -229,7 +233,7 @@ plus list, find, update, and delete.
 
 → **[Managing templates](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/message_templates/README.md)**
 
-## Webhooks
+## 🔔 Webhooks
 
 Meta pushes inbound messages, delivery statuses, and ~18 other notification types to a
 callback URL you register. Inside a Rails app:
@@ -274,7 +278,7 @@ other 18 are best-effort and flagged as such, per field.
 → **[Webhooks](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/webhooks/README.md)**
 · [inbound messages & statuses](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/webhooks/messages.md)
 
-## Media
+## 📷 Media
 
 ```ruby
 media = Whatsapp::Media.new
@@ -291,7 +295,7 @@ attacker-influenced URL. Bodies stream to disk rather than buffering in memory.
 
 → **[Media](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/media/README.md)**
 
-## Subscribed Apps
+## 🔌 Subscribed Apps
 
 Before your app receives any webhook notifications for a business account, it has to be
 subscribed to it:
@@ -307,7 +311,7 @@ Tech Providers routing several accounts to different callback URLs pass an
 
 → **[Subscribed apps](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/subscribed_app/README.md)**
 
-## Business Phone Numbers
+## 📞 Business Phone Numbers
 
 A phone number is unusable with Cloud API until it is **registered** — the prerequisite
 that makes sending, media, and templates work for it at all.
@@ -332,7 +336,7 @@ rate limit of 10 requests per number per 72-hour window.
 
 → **[Business phone numbers](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/README.md)**
 
-## Errors
+## 🚨 Errors
 
 Everything descends from `Whatsapp::Error`, and each module raises its own subclass so
 you can rescue narrowly:
@@ -357,7 +361,7 @@ rescue ActiveModel::ValidationError => e
 
 → **[Errors](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/errors.md)**
 
-## Compatibility
+## 🧩 Compatibility
 
 | | |
 | --- | --- |
@@ -366,7 +370,7 @@ rescue ActiveModel::ValidationError => e
 | Rails | Optional. Webhook controller generator activates when Rails is loaded |
 | Dependencies | `activemodel`, `http`, `logger`, `zeitwerk` |
 
-## Development
+## 🔨 Development
 
 After checking out the repo, run `bundle install`, then:
 
@@ -377,14 +381,18 @@ bundle exec rubocop   # lint only
 bin/console           # interactive prompt
 ```
 
-## Contributing
+## 🤝 Contributing
 
 Bug reports and pull requests are welcome at
 <https://github.com/saleszera/ruby-whatsapp>. Please write the failing spec first —
 this gem is developed test-first — and make sure `bundle exec rake` is green before
 opening a PR.
 
-## License
+## 📄 License
 
 Available as open source under the terms of the
 [MIT License](https://opensource.org/licenses/MIT).
+
+---
+
+![that's all folks](https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExaWlsc3ZkcGhiNWlmMXgwZmNhdnAwaWFleDM5YjZlZmRqa2MxcnM0NCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/xUPOqo6E1XvWXwlCyQ/giphy.gif)
