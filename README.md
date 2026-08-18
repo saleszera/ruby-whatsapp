@@ -22,8 +22,13 @@ error `131009` — the catch-all code the Cloud API returns for a too-long capti
 unsupported message type, a bad message ID, and a dozen other unrelated mistakes.
 
 ```ruby
-# The caption limit is 1024 characters. This never leaves your machine 🛑
-Whatsapp::Messages.send_image!(to: "+15551234567", link: photo_url, caption: "x" * 2000)
+photo = "https://example.com/new-arrivals.jpg"
+
+# Send it 📸
+Whatsapp::Messages.send_image!(to: "+15551234567", link: photo, caption: "Just landed")
+
+# Get a field wrong, and you find out here — not from Meta, three seconds later
+Whatsapp::Messages.send_image!(to: "+15551234567", link: photo, caption: "x" * 2000)
 # => ActiveModel::ValidationError: Caption is too long (maximum is 1024 characters)
 ```
 
