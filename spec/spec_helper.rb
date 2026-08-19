@@ -26,6 +26,7 @@ unless ENV["COVERAGE"] == "false"
       lib/ruby/whatsapp/configuration.rb
       lib/ruby/whatsapp/instrumentation.rb
       lib/ruby/whatsapp/response_handling.rb
+      lib/ruby/whatsapp/path_building.rb
     ]
 
     # Floors, not targets — set below the measured 96.07% line / 85.92% branch so

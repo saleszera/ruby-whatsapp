@@ -25,7 +25,7 @@ single-responsibility classes, each a stateless class-level `.call`.
 
 ```
 SubscribedApp                    module doc + Error (Whatsapp::SubscribedApp::Error)
-  ├── Transport                  shared: edge_path(client), waba_id guard
+  ├── Transport                  shared: edge_path(client); guard via Whatsapp::PathBuilding
   ├── List                       GET    -> Response::Collection
   ├── Subscribe                  POST   -> Response::Subscription
   ├── Unsubscribe                DELETE -> Response::Unsubscription
@@ -40,6 +40,10 @@ SubscribedApp                    module doc + Error (Whatsapp::SubscribedApp::Er
 expose no instance state — just class methods, same as `ResponseHandling` is also
 `extend`ed here rather than `include`d (mirroring how `Whatsapp::Messages` `extend`s it
 for its own class-level `mark_message_as_read!`).
+
+`Transport` itself `include`s `Whatsapp::PathBuilding`, the gem-wide mixin holding the
+`waba_id`/`phone_id` guard and its wording (`../path_building.rb`). What stays here is
+only the edge this module addresses; the message it raises is unchanged.
 
 ### No shared response base class
 

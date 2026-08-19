@@ -1,3 +1,7 @@
+## [0.4.1] - 2026-08-18
+
+- Add WhatsApp Business Account details and updates: `Whatsapp::BusinessPhoneNumber::Account::Get` reads the WABA node — name, timezone, message template namespace, country, and the review, verification, and ownership state — and `::Account::Update` renames the account or moves its timezone. `Get` returns an `Account::Details` carrying `ReviewStatuses`/`VerificationStatuses`/`OwnershipTypes` constants and `#approved?`/`#verified?`/`#self_owned?` predicates; statuses stay raw strings and are never validated on the way in, so a value Meta adds later still round-trips. `Update` validates locally that at least one of `name`/`timezone_id` is present and non-blank before any request is made, and reuses the existing `BusinessPhoneNumber::Response` since the endpoint answers a bare `{success}`. These two live under `BusinessPhoneNumber` but address `waba_id` rather than `phone_id` — the module's one account-scoped corner — so they carry their own transport.
+
 ## [0.4.0] - 2026-08-14
 
 - Add subscribed apps management: `Whatsapp::SubscribedApp::List`, `::Subscribe`, and `::Unsubscribe` wrap the `subscribed_apps` edge — the switch that turns a WABA's webhook delivery on or off, as opposed to `Whatsapp::Webhook`, which only deserializes notifications once Meta is already sending them. Responses expose `Collection`, `Subscription`, and `Unsubscription`, each composed from a shared `App` value object.

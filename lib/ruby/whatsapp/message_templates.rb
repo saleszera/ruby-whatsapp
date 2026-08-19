@@ -25,6 +25,7 @@ module Whatsapp
   #   templates.find(template_id: created.id).status # => "PENDING"
   # Source: https://developers.facebook.com/docs/graph-api/reference/whats-app-business-account/message_templates/
   class MessageTemplates
+    include PathBuilding
     include ResponseHandling
 
     class TemplateError < Whatsapp::Error; end
@@ -204,12 +205,7 @@ module Whatsapp
     # @return [String] The versioned path for a WABA-scoped edge.
     # @raise [TemplateError] if no WABA ID is configured.
     def edge_path(edge)
-      if blank_value?(client.waba_id)
-        raise TemplateError,
-          "waba_id is required for template management; set it via Whatsapp.configure or Client.new(waba_id:)"
-      end
-
-      client.path_for(client.waba_id, edge)
+      scoped_path(client, :waba_id, edge, error_class: TemplateError, purpose: "template management")
     end
 
     # @return [Hash] Only the editable fields that were supplied.

@@ -22,7 +22,7 @@ StandardError
     ├── Whatsapp::Media::MediaError                         any Media failure
     ├── Whatsapp::MessageTemplates::TemplateError           any template-management failure
     ├── Whatsapp::SubscribedApp::Error                      any subscribed-apps failure
-    └── Whatsapp::BusinessPhoneNumber::Error                any phone-number-onboarding failure
+    └── Whatsapp::BusinessPhoneNumber::Error                any phone-number-onboarding or account failure
 ```
 
 Each module raises **its own** error class rather than the generic
@@ -136,7 +136,14 @@ Whatsapp::SubscribedApp::List.call
 Whatsapp::BusinessPhoneNumber::Register.call(pin: "212834")
 # => Whatsapp::BusinessPhoneNumber::Error: phone_id is required for the register edge;
 #    set it via Whatsapp.configure or Client.new(phone_id:)
+
+Whatsapp::BusinessPhoneNumber::Account::Get.call
+# => Whatsapp::BusinessPhoneNumber::Error: waba_id is required for business account
+#    details; set it via Whatsapp.configure or Client.new(waba_id:)
 ```
+
+Note the last two: `BusinessPhoneNumber` spans both IDs. Its onboarding actions need
+`phone_id`; its [`Account`](business_phone_number/account.md) actions need `waba_id`.
 
 See [configuration.md](configuration.md#which-id-addresses-what).
 
