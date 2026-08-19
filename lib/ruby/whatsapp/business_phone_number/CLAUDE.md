@@ -20,9 +20,16 @@ RequestCode  ->  VerifyCode  ->  Register            (onboarding)
 Deregister                                            (the reverse switch)
 ```
 
-Alongside that flow, `Account` reads and updates the WhatsApp Business Account the
-number belongs to — the one part of this directory that addresses `waba_id` rather than
-`phone_id`. See "Why `Account` lives here" below.
+Alongside that flow, two sub-namespaces describe things *about* the number rather than its
+onboarding state:
+
+- `Profile` reads and updates the business profile a WhatsApp user sees — the public card:
+  about line, description, address, email, websites, vertical, picture. Addresses
+  `phone_id`, exactly like the onboarding actions.
+- `Account` reads and updates the WhatsApp Business Account the number belongs to — the one
+  part of this directory that addresses `waba_id` rather than `phone_id`.
+
+See "Why `Account` and `Profile` live here" below.
 
 Source:
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/registration
@@ -30,6 +37,7 @@ Source:
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/phone-number-verification-request-code-api
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/verify-code-api
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-account/whatsapp-business-account-api
+- https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/whatsapp-business-profile-api
 
 Full API research and design rationale: see the Meta docs links above.
 
@@ -40,8 +48,9 @@ account-admin actions on one edge, one class per action, each a stateless `.call
 module follows that shape, but diverges in two places where the actual API differs from
 `subscribed_apps`:
 
-1. **One `Response` class, not a `Response::` namespace.** All four actions return the
-   same `{"success": true}` shape (`VerifyCode` additionally an optional `id`).
+1. **One `Response` class, not a `Response::` namespace.** Every write action returns the
+   same `{"success": true}` shape — the four onboarding ones, `Account::Update`, and
+   `Profile::Update` (`VerifyCode` additionally an optional `id`).
    `SubscribedApp` needed three response classes because its three actions genuinely
    return different shapes; splitting one shape into several classes here would be
    ceremony with no payoff.
@@ -67,6 +76,12 @@ BusinessPhoneNumber              module doc + Error (Whatsapp::BusinessPhoneNumb
   ├── Register                   POST /{phone_id}/register     -> Response
   ├── Deregister                 POST /{phone_id}/deregister    -> Response
   ├── Response                   {success, id?}
+  ├── Profile                    the profile a user sees — phone_id, via the SAME Transport
+  │     ├── Get                  GET  /{phone_id}/whatsapp_business_profile -> Profile::Details
+  │     ├── Update               POST /{phone_id}/whatsapp_business_profile -> Response
+  │     ├── Details              messaging_product, about, address, description, email,
+  │     │                        profile_picture_url, websites, vertical
+  │     └── Verticals            the 21-value enum, shared by Update and Details
   └── Account                    the WABA node — waba_id, not phone_id
         ├── Transport            node_path(client), waba_id, NO edge segment
         ├── Get                  GET  /{waba_id}  -> Account::Details
@@ -74,12 +89,25 @@ BusinessPhoneNumber              module doc + Error (Whatsapp::BusinessPhoneNumb
         └── Details              id, name, timezone_id, statuses, ownership, ...
 ```
 
-`Transport` is `extend`ed (not `include`d) by all four onboarding action classes,
-mirroring `SubscribedApp::Transport`. Addresses `client.phone_id`, like `Media` and
-`Messages`. Both transports here `include` `Whatsapp::PathBuilding` (`../path_building.rb`),
-the gem-wide mixin owning the guard and its wording.
+`Transport` is `extend`ed (not `include`d) by all four onboarding action classes **and by
+`Profile::Get`/`Profile::Update`**, mirroring `SubscribedApp::Transport`. Addresses
+`client.phone_id`, like `Media` and `Messages`. There are only two transports in this
+directory — `Profile` needed none, since its endpoint is a phone-number-scoped *edge*, which
+is exactly what `edge_path` already builds. Both transports `include`
+`Whatsapp::PathBuilding` (`../path_building.rb`), the gem-wide mixin owning the guard and
+its wording.
 
-## Why `Account` lives here
+## Why `Account` and `Profile` live here
+
+Both describe something *about* a phone number rather than its onboarding state, which is why they sit here. They are **not** the same kind of case, and the difference is worth keeping straight:
+
+| | Addresses | Own transport? |
+|---|---|---|
+| onboarding actions | `phone_id` + edge | no — `Transport#edge_path` |
+| `Profile` | `phone_id` + edge | **no** — reuses the very same `edge_path` |
+| `Account` | `waba_id`, no edge | yes — `Account::Transport#node_path` |
+
+### `Account`
 
 It is a deliberate exception, not an accident. `Account` wraps the WABA **node**
 (`GET`/`POST /{waba_id}`), and every other WABA-scoped feature in this gem is its own
@@ -109,6 +137,37 @@ call. Two consequences worth knowing before touching this directory:
 as non-empty and both fields are optional, so an all-nil call would spend a request to
 change nothing.
 
+### `Profile`
+
+It sits here because a business profile describes how a *phone number* presents itself — the
+same reason `Account` does. Unlike `Account`, though, it is **not** an exception to anything:
+Meta exposes the profile as an edge on the phone number
+(`GET`/`POST /{phone_id}/whatsapp_business_profile`), so it addresses the ID this module
+already addresses and reuses `Transport#edge_path` untouched. Adding a third transport, or
+reaching for a caller-supplied ID, would both be wrong here.
+
+Two things about it are worth knowing:
+
+1. **`Profile::Details` owns the `data` envelope.** Meta's reference documents the read as
+   `{"data": [{"business_profile": {...}}]}`, while live responses are observed to carry the
+   profile fields directly in `data[0]`. `Details.deserialize` reads **both** rather than
+   betting on one, and takes the whole parsed body so the envelope knowledge lives in one
+   place. That follows this gem's habit of flattening meaningless wrapper levels —
+   `SubscribedApp::Response::App` flattens `whatsapp_business_api_data`,
+   `MessageTemplates::Response::Paging` flattens `paging.cursors`. Only the first entry is
+   read: a phone number has exactly one profile.
+2. **`Profile::Update` reuses `BusinessPhoneNumber::Response`**, for the same reason
+   `Account::Update` does — the endpoint answers a bare `{success}`. Write it out as
+   `BusinessPhoneNumber::Response` at the call site; bare `Response` resolving up two
+   lexical scopes is too subtle. `Get` gets its own `Details` because the shape is genuinely
+   different. Note this endpoint does **not** return an `id`, so `Response#id` stays
+   `VerifyCode`-only.
+
+`Profile::Verticals` is the one enum in this directory with its own file. Two consumers —
+`Update` validates against it, `Details` documents its raw value against it — so it follows
+`MessageTemplates::Categories`' precedent rather than `Register::DataLocalizationRegions`',
+per convention 5 below.
+
 ## Conventions
 
 Same as `../subscribed_app/CLAUDE.md` unless noted:
@@ -118,9 +177,10 @@ Same as `../subscribed_app/CLAUDE.md` unless noted:
 2. `success` is computed as `response["success"] == true` — a strict boolean, the same
    convention as `SubscribedApp::Response::Unsubscription`, `MessageTemplates#success?`
    and `Media#delete`.
-3. Each action class raises `Whatsapp::BusinessPhoneNumber::Error` (via
-   `Transport#edge_path` for a missing `phone_id`, or `ResponseHandling#handle_response!`
-   for a failed request) — never the generic `Whatsapp::RequestError`.
+3. Each action class raises `Whatsapp::BusinessPhoneNumber::Error` (via a transport's path
+   guard for a missing ID, or `ResponseHandling#handle_response!` for a failed request) —
+   never the generic `Whatsapp::RequestError`. `Account` and `Profile` reuse the module's own
+   `Error` rather than declaring their own, so one `rescue` still covers the whole directory.
 4. Credentials in transit are redacted in `#inspect` — `Register`'s PIN
    (`pin=[REDACTED]`) and `VerifyCode`'s OTP (`code=[REDACTED]`) — the same as
    `Client#inspect`/`Configuration#inspect` redact `api_key`/`app_secret`, and neither
@@ -131,14 +191,23 @@ Same as `../subscribed_app/CLAUDE.md` unless noted:
    `MessageTemplates::Template::SubCategories`'s precedent, not
    `MessageTemplates::Categories`'s (which is shared by three classes). Each `.normalize`
    accepts either casing and emits uppercase, per the enum convention in
-   `../message_templates/CLAUDE.md`.
+   `../message_templates/CLAUDE.md`. `Profile::Verticals` is the one enum here with its own
+   file, because it has two consumers — see "Why `Account` and `Profile` live here" above.
 6. **Validate only what Meta documents, nothing speculative.** `Register`'s `pin` gets a
    `/\A\d{6}\z/` format check because Meta documents it as 6-digit; `VerifyCode`'s
    `code` and `RequestCode`'s `language` get presence only, because Meta documents both
    as plain `string` with no format or enum. `language` is deliberately **not**
    validated against `Utils::LanguageCodes` — that list belongs to the template API
    (locale codes Meta *approves*), and this field is closer to a delivery-preference
-   locale than a template's `language`.
+   locale than a template's `language`. `Profile::Update` follows the same line: the vertical
+   enum and Meta's documented character/count limits are enforced, but `email`'s *format* is
+   not — Meta validates addresses server-side, and a regex here would reject valid exotic
+   ones, the same standing decision as `override_callback_uri` in `../subscribed_app/`.
+7. **Write-side `nil` means "leave alone", not "blank it".** `Profile::Update#serialize` and
+   `Account::Update#serialize` both `.compact`, since Meta reads an explicit `null` as an
+   instruction to clear the field. `Profile::Update` has one deliberate exception: an empty
+   `websites` array survives compaction, because that *is* how the list is cleared — and it
+   therefore also satisfies the "change something" guard.
 
 ## Reference
 
@@ -150,18 +219,26 @@ Same as `../subscribed_app/CLAUDE.md` unless noted:
 | `Deregister.call` | `POST /{phone_id}/deregister` | `Response` |
 | `Account::Get.call(fields:)` | `GET /{waba_id}` | `Account::Details` |
 | `Account::Update.call(name:, timezone_id:)` | `POST /{waba_id}` | `Response` |
+| `Profile::Get.call(fields:)` | `GET /{phone_id}/whatsapp_business_profile` | `Profile::Details` |
+| `Profile::Update.call(**fields)` | `POST /{phone_id}/whatsapp_business_profile` | `Response` |
 
-The four onboarding actions require `phone_id` (set via `Whatsapp.configure` or
-`Client.new(phone_id:)`) and the `whatsapp_business_messaging` +
+The four onboarding actions and the two `Profile` actions require `phone_id` (set via
+`Whatsapp.configure` or `Client.new(phone_id:)`) and the `whatsapp_business_messaging` +
 `whatsapp_business_management` permissions. The two `Account` actions require `waba_id`
 instead, and only `whatsapp_business_management`.
 
-`Account::Get` sends no `fields` param when none is given, so Meta returns its own
-defaults (`id`, `name`) — matching `SubscribedApp::List`. `Fields::ALL` is offered for
+`Account::Get` and `Profile::Get` send no `fields` param when none is given, so Meta returns
+its own defaults — matching `SubscribedApp::List`. `Fields::ALL` is offered for
 convenience but is **not** used to validate caller input: a field Meta adds later must
 work without a gem release. `Account::Details` keeps every status as a raw string for
 the same reason, with `ReviewStatuses`/`VerificationStatuses`/`OwnershipTypes`
-constants and `#approved?`/`#verified?`/`#self_owned?` predicates for comparison only.
+constants and `#approved?`/`#verified?`/`#self_owned?` predicates for comparison only;
+`Profile::Details` keeps `vertical` raw for the same reason, with `Verticals::ALL` to
+compare against.
+
+`Profile::Update#serialize` always sends `messaging_product: "whatsapp"` and compacts away
+every field not given. Its documented limits are about 139, address 256, description 512,
+and email 128 characters, plus at most 2 websites.
 
 `RequestCode#serialize` always sends both `code_method` (`"SMS"` or `"VOICE"`) and
 `language` — both documented required, so neither is compacted away.
@@ -195,6 +272,9 @@ Whatsapp::BusinessPhoneNumber::Register.call(pin: "212834").success
 
 Whatsapp::BusinessPhoneNumber::Deregister.call.success
 # => true
+
+Whatsapp::BusinessPhoneNumber::Profile::Update.new(vertical: "retail", websites: []).serialize
+# => { messaging_product: "whatsapp", vertical: "RETAIL", websites: [] }
 ```
 
 ### Unverified against a live WABA
@@ -207,6 +287,19 @@ and record here when someone has a real WABA to hand:
 - whether an unrecognized `fields` entry 400s or is silently ignored
 - whether `primary_business_location` is a plain string or a nested object
 
+`Profile`'s specs are likewise built from Meta's published schema. The first item is the one
+genuinely load-bearing uncertainty in the feature:
+
+- **which shape the read envelope actually takes.** Meta's reference declares the `data`
+  entry as `{"business_profile": {...}}`, but live responses are widely observed to put the
+  profile fields directly in `data[0]`. `Profile::Details.deserialize` reads both, so either
+  answer works — but if a live account settles it, simplify `unwrap` and say so here.
+- whether the character limits (about 139, address 256, description 512, email 128, 2
+  websites) are enforced by *this* edge or only by the separate profile node endpoint. They
+  are validated client-side either way, since a local rejection costs nothing.
+- whether `POST` ever echoes anything beyond `{success}`. The reference says it does not, so
+  `Response#id` stays `VerifyCode`-only.
+
 ## Not implemented
 
 - **Client-side rate-limit tracking.** `register`/`deregister` document a hard cap (10
@@ -217,6 +310,11 @@ and record here when someone has a real WABA to hand:
   `handle_response!` is the whole of the handling.
 - **Two-step verification PIN management.** `register` consumes an existing PIN;
   setting or changing one is a different, undocumented-here endpoint.
+- **Resumable Upload API.** `Profile::Update` accepts and forwards `profile_picture_handle`
+  as an opaque string, but the endpoint that mints one is not wrapped. `Media#upload` returns
+  a media ID, which is a different thing and will not work here. Same standing exclusion as
+  media handles in `../message_templates/CLAUDE.md`.
+- **Profile read caching.** Meta suggests it; invalidation is an application concern.
 - **A `bin/dev` smoke test.** Unlike the throwaway template the existing smoke flow
   creates and deletes, exercising this flow against a real number is destructive and
   rate-limited.
@@ -229,5 +327,5 @@ and record here when someone has a real WABA to hand:
       `# @!attribute` tag and any validation Meta documents as a client-side rule
 - [ ] Thread it through that class's `.call`/`#serialize`
 - [ ] Add a row/example to this file and to `docs/business_phone_number/README.md`
-      (or `docs/business_phone_number/account.md` for an `Account` field)
+      (or `account.md` / `profile.md` for an `Account` / `Profile` field)
 - [ ] `bundle exec rake` green before committing
