@@ -44,7 +44,7 @@ This is a Ruby gem (`ruby-whatsapp`) providing a client for the Meta WhatsApp Cl
 - `Whatsapp::Media` — handles media upload, URL retrieval, download, and deletion via the API.
 - `Whatsapp::MessageTemplates` — full CRUD for the templates on a WhatsApp Business Account (create/list/find/update/delete, plus `upsert` and `create_from_library`). Addresses `waba_id`, not `phone_id`.
 - `Whatsapp::SubscribedApp` — subscribes/unsubscribes this app from a WABA's webhook notifications and lists who's subscribed, via `List`/`Subscribe`/`Unsubscribe`, one class per action. Addresses `waba_id`, like `MessageTemplates`.
-- `Whatsapp::BusinessPhoneNumber` — onboards/deboards a phone number with Cloud API via `RequestCode`/`VerifyCode`/`Register`/`Deregister`. Addresses `phone_id`, like `Media`/`Messages`, not `waba_id`.
+- `Whatsapp::BusinessPhoneNumber` — onboards/deboards a phone number with Cloud API via `RequestCode`/`VerifyCode`/`Register`/`Deregister`. Addresses `phone_id`, like `Media`/`Messages`. Its `Account::Get`/`Account::Update` are the exception: they read and update the WABA node itself, so they address `waba_id`.
 
 **Message class hierarchy:**
 
@@ -84,11 +84,12 @@ All message classes validate `:to` (recipient phone number) and implement `seria
 - `Transport` is `extend`ed by all three action classes for the one thing they share: building the WABA-scoped path and guarding on `client.waba_id`.
 - Three response shapes, so `Response::{Collection,Subscription,Unsubscription}` rather than one class; `Response::App` (the flattened `whatsapp_business_api_data`) is composed by both `Collection` and `Subscription` rather than duplicated.
 
-**Business phone numbers:** `Whatsapp::BusinessPhoneNumber` wraps a phone number's whole onboarding path with Cloud API — `RequestCode` → `VerifyCode` → `Register`, plus `Deregister` as the reverse switch — the prerequisite that makes sending, media, and templates work for it at all, as opposed to `Whatsapp::SubscribedApp`, which turns webhook delivery on/off for a whole WABA. See `lib/ruby/whatsapp/business_phone_number/CLAUDE.md` and `docs/business_phone_number/README.md`; in short:
+**Business phone numbers:** `Whatsapp::BusinessPhoneNumber` wraps a phone number's whole onboarding path with Cloud API — `RequestCode` → `VerifyCode` → `Register`, plus `Deregister` as the reverse switch — the prerequisite that makes sending, media, and templates work for it at all, as opposed to `Whatsapp::SubscribedApp`, which turns webhook delivery on/off for a whole WABA. See `lib/ruby/whatsapp/business_phone_number/CLAUDE.md`, `docs/business_phone_number/README.md`, and `docs/business_phone_number/account.md`; in short:
 
 - One class per action like `SubscribedApp`, but each (except `Deregister`) a validated instance with a public `#serialize` (plus a class-level `.call`) rather than a pure class method — Meta documents real client-side rules (`register`'s 6-digit PIN and region codes, `request_code`'s closed set of delivery methods), and a rejected attempt still costs against the rate limit each edge documents.
 - One `Response` class, not a `Response::` namespace — all four endpoints return the same `{success}` shape, `VerifyCode` additionally an optional `id`, unlike `SubscribedApp`'s three genuinely different shapes.
 - Addresses `phone_id`, like `MessageTemplates` addresses `waba_id`.
+- `Account::Get`/`Account::Update` are the one deliberate exception: they wrap the WABA **node** (`GET`/`POST /{waba_id}`), so they address `waba_id` and carry their own `Account::Transport` — `node_path`, guarding `waba_id`, with no edge segment, versus the outer `Transport`'s `edge_path`. Placed here rather than in a top-level module because they describe the account a number belongs to. `Account::Update` reuses `BusinessPhoneNumber::Response` (the endpoint answers a bare `{success}`); `Account::Get` returns its own `Account::Details`, whose statuses stay raw strings with constants and predicates for comparison, never validated on the way in.
 
 **Webhooks (inbound):** `Whatsapp::Webhook` deserializes Meta's incoming webhook notifications — the opposite direction from everything above. See `lib/ruby/whatsapp/webhook/CLAUDE.md` for the full dispatch-table conventions and field reference; in short:
 
