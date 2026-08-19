@@ -2,11 +2,11 @@
 
 module Whatsapp
   module BusinessPhoneNumber
-    # The response shared by all five actions in this module: `{success}`, with an
+    # The response shared by every write action in this module: `{success}`, with an
     # optional `id` that only `VerifyCode` ever populates. One class covers all of
     # them — unlike {Whatsapp::SubscribedApp}'s `Response::*` namespace — since
-    # {Register}, {Deregister}, {RequestCode}, {VerifyCode}, and {Account::Update} all
-    # return this same shape, `id` included or not.
+    # {Register}, {Deregister}, {RequestCode}, {VerifyCode}, {Account::Update}, and
+    # {Profile::Update} all return this same shape, `id` included or not.
     # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/registration
     class Response
       # @!attribute [rw] success

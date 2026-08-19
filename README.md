@@ -160,6 +160,7 @@ response.contacts.first.wa_id  # => "15551234567"
 | [**Subscribed Apps**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/subscribed_app/README.md) | Turning webhook delivery on and off for an account |
 | [**Business Phone Numbers**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/README.md) | Onboarding: request code → verify → register |
 | [**Business Account**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/account.md) | Reading and updating the account: name, timezone, review status |
+| [**Business Profile**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/profile.md) | The profile a user sees: about, description, address, vertical, picture |
 | [**Errors**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/errors.md) | The exception hierarchy and retry strategy |
 
 Or start at the [documentation index](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/README.md).
@@ -355,8 +356,25 @@ details.approved?   # => true
 Whatsapp::BusinessPhoneNumber::Account::Update.call(name: "Acme Corporation").success  # => true
 ```
 
+And so is the **business profile** — the card a user sees before they reply. It addresses
+the same `phone_id` as the onboarding actions:
+
+```ruby
+Whatsapp::BusinessPhoneNumber::Profile::Get.call.about
+# => "Open daily 9-5"
+
+Whatsapp::BusinessPhoneNumber::Profile::Update.call(
+  about: "Open daily 9-6", vertical: "RETAIL", websites: ["https://acme.test"]
+).success
+# => true
+```
+
+Character limits, the 21-value vertical enum, and the two-website cap are all checked
+before the request goes out.
+
 → **[Business phone numbers](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/README.md)**
 · [the business account](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/account.md)
+· [the business profile](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/profile.md)
 
 ## 🚨 Errors
 
