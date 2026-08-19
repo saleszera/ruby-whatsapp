@@ -133,6 +133,15 @@ RSpec.describe Whatsapp::BusinessPhoneNumber::Register do
         .to raise_error(Whatsapp::BusinessPhoneNumber::Error, /phone_id/)
     end
 
+    it "names the exact configuration fix, and the edge, in the guard message" do
+      client = Whatsapp::Client.new(phone_id: nil)
+
+      expect { described_class.call(pin: "212834", client:) }.to raise_error(
+        Whatsapp::BusinessPhoneNumber::Error,
+        "phone_id is required for the register edge; set it via Whatsapp.configure or Client.new(phone_id:)"
+      )
+    end
+
     it "raises a BusinessPhoneNumber::Error when the API rejects the request" do
       stub_request(:post, edge).to_return(
         status: 400, headers: json, body: { error: { message: "Invalid parameter", code: 100 } }.to_json

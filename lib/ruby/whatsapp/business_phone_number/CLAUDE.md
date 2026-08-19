@@ -61,14 +61,14 @@ module follows that shape, but diverges in two places where the actual API diffe
 
 ```
 BusinessPhoneNumber              module doc + Error (Whatsapp::BusinessPhoneNumber::Error)
-  ├── Transport                  shared: edge_path(client, action), phone_id guard
+  ├── Transport                  shared: edge_path(client, action); guard via Whatsapp::PathBuilding
   ├── RequestCode                POST /{phone_id}/request_code -> Response
   ├── VerifyCode                 POST /{phone_id}/verify_code  -> Response
   ├── Register                   POST /{phone_id}/register     -> Response
   ├── Deregister                 POST /{phone_id}/deregister    -> Response
   ├── Response                   {success, id?}
   └── Account                    the WABA node — waba_id, not phone_id
-        ├── Transport            node_path(client), waba_id guard, NO edge segment
+        ├── Transport            node_path(client), waba_id, NO edge segment
         ├── Get                  GET  /{waba_id}  -> Account::Details
         ├── Update               POST /{waba_id}  -> Response
         └── Details              id, name, timezone_id, statuses, ownership, ...
@@ -76,7 +76,8 @@ BusinessPhoneNumber              module doc + Error (Whatsapp::BusinessPhoneNumb
 
 `Transport` is `extend`ed (not `include`d) by all four onboarding action classes,
 mirroring `SubscribedApp::Transport`. Addresses `client.phone_id`, like `Media` and
-`Messages`.
+`Messages`. Both transports here `include` `Whatsapp::PathBuilding` (`../path_building.rb`),
+the gem-wide mixin owning the guard and its wording.
 
 ## Why `Account` lives here
 
@@ -87,12 +88,14 @@ describes the account a phone number belongs to, and that placement was an expli
 call. Two consequences worth knowing before touching this directory:
 
 1. **Two transports, deliberately.** `BusinessPhoneNumber::Transport#edge_path(client,
-   action)` guards `phone_id` and always appends an edge segment; the node endpoint
-   needs neither. `Account::Transport#node_path(client)` guards `waba_id` and calls
-   `client.path_for(client.waba_id)` with no extra segment. The methods are named
-   differently on purpose — `node_path` vs `edge_path` — so the two can never be
-   confused at a call site, even though `Account::Transport` shadows the outer
-   `Transport` by lexical scope inside `module Account`.
+   action)` addresses `phone_id` and always appends an edge segment; the node endpoint
+   needs neither. `Account::Transport#node_path(client)` addresses `waba_id` with no
+   extra segment. Since both now delegate the guard and its message to
+   `Whatsapp::PathBuilding`, each file is down to one `scoped_path` call and the naming
+   *is* the point: `node_path` vs `edge_path` keeps the two from being confused at a call
+   site, even though `Account::Transport` shadows the outer `Transport` by lexical scope
+   inside `module Account`. Do not collapse them into one method with an optional
+   segment — that would put an edge and a node behind the same name.
 2. **`Account::Update` reuses `BusinessPhoneNumber::Response`.** The endpoint answers
    with a bare `{"success": true}` — exactly the shape the existing class already
    models, and exactly the case its one-class-for-all rationale was written for. Write

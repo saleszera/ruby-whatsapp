@@ -56,6 +56,15 @@ RSpec.describe Whatsapp::SubscribedApp::List do
         .to raise_error(Whatsapp::SubscribedApp::Error, /waba_id/)
     end
 
+    it "names the exact configuration fix in the guard message" do
+      client = Whatsapp::Client.new(waba_id: nil)
+
+      expect { described_class.call(client:) }.to raise_error(
+        Whatsapp::SubscribedApp::Error,
+        "waba_id is required for subscribed apps; set it via Whatsapp.configure or Client.new(waba_id:)"
+      )
+    end
+
     it "raises a SubscribedApp::Error when the API rejects the request" do
       stub_request(:get, edge).to_return(
         status: 403, headers: json, body: { error: { message: "Permissions error", code: 200 } }.to_json

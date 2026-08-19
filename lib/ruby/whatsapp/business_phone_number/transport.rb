@@ -6,7 +6,12 @@ module Whatsapp
     # {VerifyCode}: all four address the same phone-number-scoped resource, differing
     # only in edge name and body. Extended (not included) because {#edge_path} is used
     # from class-level `.call` methods (as a private class method).
+    #
+    # The guard itself and its message live in {Whatsapp::PathBuilding}, shared with every
+    # other ID-scoped feature; what stays here is the ID this module addresses.
     module Transport
+      include Whatsapp::PathBuilding
+
     private
 
       # @param client [Whatsapp::Client]
@@ -15,13 +20,7 @@ module Whatsapp
       # @return [String] The versioned path to the phone number's action edge.
       # @raise [Error] if no phone number ID is configured.
       def edge_path(client, action)
-        if client.phone_id.nil? || client.phone_id.to_s.empty?
-          raise Error,
-            "phone_id is required for the #{action} edge; " \
-              "set it via Whatsapp.configure or Client.new(phone_id:)"
-        end
-
-        client.path_for(client.phone_id, action)
+        scoped_path(client, :phone_id, action, error_class: Error, purpose: "the #{action} edge")
       end
     end
   end
