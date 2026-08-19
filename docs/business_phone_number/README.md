@@ -17,6 +17,11 @@ Addresses your **phone number** (`phone_id`, not `waba_id`), like
 [messages](../messages/README.md) and [media](../media/README.md), and needs both the
 `whatsapp_business_messaging` and `whatsapp_business_management` permissions.
 
+> **Looking for the account itself?** [`Account::Get` / `Account::Update`](account.md)
+> read and update the WhatsApp Business Account a number belongs to — its name,
+> timezone, review and verification status. Those are the one `waba_id`-scoped corner
+> of this module.
+
 > **Unrelated to [`SubscribedApp`](../subscribed_app/README.md).** That turns *webhook
 > delivery* on and off for a whole WhatsApp Business Account. This is per phone number
 > and has nothing to do with notifications.
@@ -41,6 +46,8 @@ Whatsapp::BusinessPhoneNumber::Deregister.call
 | `VerifyCode.call(code:)` | `POST /{phone_id}/verify_code` | `Response` (may carry `id`) |
 | `Register.call(pin:, data_localization_region:)` | `POST /{phone_id}/register` | `Response` |
 | `Deregister.call` | `POST /{phone_id}/deregister` | `Response` |
+| [`Account::Get.call(fields:)`](account.md) | `GET /{waba_id}` | `Account::Details` |
+| [`Account::Update.call(name:, timezone_id:)`](account.md) | `POST /{waba_id}` | `Response` |
 
 Every action accepts an optional `client:` and raises
 `Whatsapp::BusinessPhoneNumber::Error` if `phone_id` is missing or the API rejects the
@@ -203,6 +210,10 @@ Local validation failures raise `ActiveModel::ValidationError` before any reques
 - **Client-side rate-limit tracking** — server-side state the gem cannot observe.
 - **Two-step verification PIN management.** `Register` *consumes* an existing PIN;
   setting or changing one is a different endpoint.
+
+---
+
+**See also:** [Reading and updating the business account](account.md)
 
 ---
 

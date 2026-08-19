@@ -33,8 +33,8 @@ Whatsapp::Messages.send_image!(to: "+15551234567", link: photo, caption: "x" * 2
 ```
 
 Beyond sending, the gem covers the whole surface: media upload and download, template
-creation and management, inbound webhook parsing, webhook subscription, and phone
-number onboarding.
+creation and management, inbound webhook parsing, webhook subscription, phone number
+onboarding, and reading or updating the business account itself.
 
 ## Table of Contents
 
@@ -107,7 +107,7 @@ end
 | --- | --- | --- |
 | `api_key` | — | Everything |
 | `phone_id` | — | Messages, media, phone-number onboarding |
-| `waba_id` | — | Template management, subscribed apps |
+| `waba_id` | — | Template management, subscribed apps, the business account |
 | `verify_token` | — | The webhook GET handshake |
 | `app_secret` | — | Webhook signature verification |
 | `host` | `https://graph.facebook.com` | Overriding the API host |
@@ -120,9 +120,12 @@ end
 phone_id  ──►  Messages · Media · BusinessPhoneNumber
                permission: whatsapp_business_messaging
 
-waba_id   ──►  MessageTemplates · SubscribedApp
+waba_id   ──►  MessageTemplates · SubscribedApp · BusinessPhoneNumber::Account
                permission: whatsapp_business_management
 ```
+
+`BusinessPhoneNumber` appears on both sides: its onboarding actions address a phone
+number, its `Account` actions the account that number belongs to.
 
 `api_key`, `app_secret`, and `verify_token` are redacted from `Configuration#inspect`
 and `Client#inspect`, so they will not leak into logs or error reports.
@@ -156,6 +159,7 @@ response.contacts.first.wa_id  # => "15551234567"
 | [**Media**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/media/README.md) | Upload, download, delete, and the token-safety allowlist |
 | [**Subscribed Apps**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/subscribed_app/README.md) | Turning webhook delivery on and off for an account |
 | [**Business Phone Numbers**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/README.md) | Onboarding: request code → verify → register |
+| [**Business Account**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/account.md) | Reading and updating the account: name, timezone, review status |
 | [**Errors**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/errors.md) | The exception hierarchy and retry strategy |
 
 Or start at the [documentation index](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/README.md).
@@ -339,7 +343,20 @@ The 6-digit two-step verification PIN and the local-storage region are validated
 client-side — which matters here, because a rejected attempt still counts against a
 rate limit of 10 requests per number per 72-hour window.
 
+The account that number belongs to is readable and writable too — the one part of this
+module that addresses `waba_id` rather than `phone_id`:
+
+```ruby
+details = Whatsapp::BusinessPhoneNumber::Account::Get.call(fields: %w[name account_review_status])
+
+details.name        # => "Acme Corp"
+details.approved?   # => true
+
+Whatsapp::BusinessPhoneNumber::Account::Update.call(name: "Acme Corporation").success  # => true
+```
+
 → **[Business phone numbers](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/README.md)**
+· [the business account](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/account.md)
 
 ## 🚨 Errors
 
@@ -353,7 +370,7 @@ you can rescue narrowly:
 | `Whatsapp::Media::MediaError` | Anything in `Media` |
 | `Whatsapp::MessageTemplates::TemplateError` | Anything in `MessageTemplates` |
 | `Whatsapp::SubscribedApp::Error` | Anything in `SubscribedApp` |
-| `Whatsapp::BusinessPhoneNumber::Error` | Anything in `BusinessPhoneNumber` |
+| `Whatsapp::BusinessPhoneNumber::Error` | Anything in `BusinessPhoneNumber`, including `Account` |
 
 Local validation failures raise `ActiveModel::ValidationError` instead — they happen at
 construction time, before any network call, and carry per-attribute detail:
