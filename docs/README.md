@@ -59,6 +59,7 @@ Full reference for [ruby-whatsapp](https://github.com/saleszera/ruby-whatsapp). 
 | [subscribed_app/](subscribed_app/README.md) | Turning webhook delivery on and off for a WABA |
 | [business_phone_number/](business_phone_number/README.md) | Onboarding a phone number: request code → verify → register |
 | [business_phone_number/account.md](business_phone_number/account.md) | Reading and updating the business account itself |
+| [business_phone_number/profile.md](business_phone_number/profile.md) | Reading and updating the business profile a user sees |
 
 ## Reading order
 

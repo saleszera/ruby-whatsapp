@@ -22,6 +22,11 @@ Addresses your **phone number** (`phone_id`, not `waba_id`), like
 > timezone, review and verification status. Those are the one `waba_id`-scoped corner
 > of this module.
 
+> **Looking for the profile a user sees?** [`Profile::Get` / `Profile::Update`](profile.md)
+> read and write the about line, description, address, email, websites, industry vertical,
+> and picture. Those address your phone number (`phone_id`), just like the four actions
+> below.
+
 > **Unrelated to [`SubscribedApp`](../subscribed_app/README.md).** That turns *webhook
 > delivery* on and off for a whole WhatsApp Business Account. This is per phone number
 > and has nothing to do with notifications.
@@ -48,6 +53,8 @@ Whatsapp::BusinessPhoneNumber::Deregister.call
 | `Deregister.call` | `POST /{phone_id}/deregister` | `Response` |
 | [`Account::Get.call(fields:)`](account.md) | `GET /{waba_id}` | `Account::Details` |
 | [`Account::Update.call(name:, timezone_id:)`](account.md) | `POST /{waba_id}` | `Response` |
+| [`Profile::Get.call(fields:)`](profile.md) | `GET /{phone_id}/whatsapp_business_profile` | `Profile::Details` |
+| [`Profile::Update.call(**fields)`](profile.md) | `POST /{phone_id}/whatsapp_business_profile` | `Response` |
 
 Every action accepts an optional `client:` and raises
 `Whatsapp::BusinessPhoneNumber::Error` if `phone_id` is missing or the API rejects the
@@ -213,7 +220,8 @@ Local validation failures raise `ActiveModel::ValidationError` before any reques
 
 ---
 
-**See also:** [Reading and updating the business account](account.md)
+**See also:** [Reading and updating the business account](account.md) ·
+[Reading and updating the business profile](profile.md)
 
 ---
 

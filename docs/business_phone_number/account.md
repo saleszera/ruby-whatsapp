@@ -162,4 +162,9 @@ Whatsapp::BusinessPhoneNumber::Account::Get.call(
 
 ---
 
+**See also:** [Reading and updating the business profile](profile.md) ·
+[Registering business phone numbers](README.md)
+
+---
+
 **Meta docs:** <https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-account/whatsapp-business-account-api>
