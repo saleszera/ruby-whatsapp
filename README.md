@@ -69,9 +69,11 @@ onboarding, and reading or updating the business account itself.
 - **Secrets stay out of logs.** `api_key`, `app_secret`, and `verify_token` are
   redacted from every `#inspect`, including credentials in transit like a
   registration PIN.
-- **Inbound webhooks, fully typed.** An object tree for all 19 documented Meta
+- **Inbound webhooks, fully typed.** An object tree for all 21 documented Meta
   notification fields, plus HMAC signature verification and a Rails controller
-  generator.
+  generator. Includes Business-Scoped User ID (BSUID) support, so a message still
+  identifies its sender once they adopt a username and their phone number disappears
+  from the payload.
 - **Persistent HTTP connections** via `HTTP.persistent`, reused across requests, with
   pluggable logging.
 - **Four runtime dependencies**, no Rails requirement. Rails integration activates
@@ -155,7 +157,7 @@ response.contacts.first.wa_id  # => "15551234567"
 | [**Configuration**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/configuration.md) | Credentials, the client, connection reuse, instrumentation |
 | [**Messages**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/messages/README.md) | Every message kind, one page each, with exact payloads |
 | [**Message Templates**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/message_templates/README.md) | Creating and managing templates: standard, auth, carousel, offers, library |
-| [**Webhooks**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/webhooks/README.md) | Install, verification, signatures, and all 19 notification fields |
+| [**Webhooks**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/webhooks/README.md) | Install, verification, signatures, and all 21 notification fields |
 | [**Media**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/media/README.md) | Upload, download, delete, and the token-safety allowlist |
 | [**Subscribed Apps**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/subscribed_app/README.md) | Turning webhook delivery on and off for an account |
 | [**Business Phone Numbers**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/README.md) | Onboarding: request code → verify → register |
@@ -282,8 +284,9 @@ message.id      # => "wamid.HBg..."
 message.body    # => "Does it come in another color?"
 ```
 
-All 19 documented fields get a class. Only `messages` has a Meta-published schema; the
-other 18 are best-effort and flagged as such, per field.
+All 21 documented fields get a class. `messages`, `user_id_update`, and
+`business_username_updates` have a Meta-published schema; the other 18 are best-effort
+and flagged as such, per field.
 
 → **[Webhooks](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/webhooks/README.md)**
 · [inbound messages & statuses](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/webhooks/messages.md)

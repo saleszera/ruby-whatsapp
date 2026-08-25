@@ -1,7 +1,9 @@
 # `messages`
 
 Inbound customer messages and outbound delivery statuses — the field you will spend
-almost all your time on, and the only one with a Meta-published JSON schema.
+almost all your time on, and one of only three fields with a Meta-published JSON
+schema (alongside [`user_id_update`](user_id_update.md) and
+[`business_username_updates`](business_username_updates.md)).
 
 `Whatsapp::Webhook::Messages`
 
@@ -49,7 +51,7 @@ value.statuses                    # => []
 | --- | --- |
 | `messaging_product` | `"whatsapp"` |
 | `metadata` | `Metadata` — `display_phone_number`, `phone_number_id` |
-| `contacts` | `Array<Contact>` — `profile_name`, `wa_id` |
+| `contacts` | `Array<Contact>` — `profile_name`, `username`, `wa_id`, `user_id`, `parent_user_id` |
 | `messages` | `Array<Message::*>` |
 | `statuses` | `Array<Status>` |
 
@@ -59,6 +61,27 @@ both accessors always return an array, so you can iterate either without a nil c
 > `contacts` here is the value-level sender identity (who wrote to you). It is a
 > different thing from [`Message::Contacts`](#contacts) below, which is a contact
 > *card* someone shared with you.
+
+### Business-scoped user IDs (BSUID)
+
+Once a WhatsApp user adopts a username, their phone number may stop appearing in
+webhooks — `wa_id`/`from`/`recipient_id` are omitted, and the only stable identifier
+left is their **business-scoped user ID** (BSUID), a country-code-prefixed string like
+`"US.13491208655302741918"` assigned to `user_id`/`from_user_id`/`recipient_user_id`.
+It is always present, regardless of whether a username has been adopted. A
+`parent_user_id`/`from_parent_user_id`/`recipient_parent_user_id` variant additionally
+appears if you have enrolled in [parent BSUIDs](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids#parent-business-scoped-user-ids)
+(shared across business portfolios). See
+[Business-scoped user IDs](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids)
+for the full rollout details.
+
+```ruby
+contact = value.contacts.first
+contact.wa_id           # => "16315551181"  or nil once phone number sharing stops
+contact.user_id         # => "US.13491208655302741918" — always present
+contact.username        # => "@testusername" or nil — set only once adopted
+contact.parent_user_id  # => set only when parent BSUIDs are enabled
+```
 
 ---
 
@@ -72,7 +95,9 @@ All message classes share this envelope from `Message::Base`:
 
 | Accessor | Meaning |
 | --- | --- |
-| `from` | The customer's WhatsApp ID |
+| `from` | The customer's WhatsApp ID, or `nil` once they adopt a username (see [BSUID](#business-scoped-user-ids-bsuid)) |
+| `from_user_id` | The customer's BSUID — always present |
+| `from_parent_user_id` | The customer's parent BSUID, present only if enabled |
 | `id` | The WAMID — pass it to [`mark_message_as_read!`](../messages/mark_message_as_read.md) |
 | `timestamp` | Unix seconds, as a String |
 | `type` | `"text"`, `"image"`, … |
@@ -169,6 +194,15 @@ card.phones.first.phone   # => "+1"
 Nested objects mirror the outbound [contacts message](../messages/contacts.md)
 field-for-field: `Name`, `Phone`, `Email`, `Address`, `Org`, `Url`, plus `birthday`.
 
+When the card arrives from a [`REQUEST_CONTACT_INFO`
+button](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids#requesting-phone-numbers-from-users)
+or a direct in-chat share, two more fields are present:
+
+```ruby
+card.origin  # => "contact_request" (button tap) or "other" (shared from the chat)
+card.vcard   # => the raw vCard string when origin is "other"; nil for "contact_request"
+```
+
 ### Interactive
 
 A tap on [reply buttons or a list](../messages/interactive.md).
@@ -253,6 +287,14 @@ message.change_type  # => "customer_changed_number"
 
 Note `change_type`, not `type` — `type` is taken by the message envelope.
 
+When a user's BSUID itself changes (`change_type == "user_changed_user_id"`), the new
+identifiers are also present:
+
+```ruby
+message.user_id         # => the customer's new BSUID
+message.parent_user_id  # => the customer's new parent BSUID, if enabled
+```
+
 ### Reaction
 
 ```json
@@ -336,14 +378,22 @@ status = value.statuses.first
 status.id            # => "wamid.HBg"      — matches what send! returned
 status.status        # => "delivered"      — sent | delivered | read | failed
 status.timestamp     # => "1750263773"
-status.recipient_id  # => "16505551234"
+status.recipient_id  # => "16505551234", or nil once sent to a BSUID (see below)
 ```
 
 | Accessor | Type |
 | --- | --- |
+| `recipient_user_id` | The recipient's BSUID |
+| `recipient_parent_user_id` | The recipient's parent BSUID, present only if enabled |
 | `conversation` | `Status::Conversation` — `id`, `origin_type`, `expiration_timestamp` |
 | `pricing` | `Status::Pricing` — `billable`, `pricing_model`, `category` |
 | `errors` | `Array<Webhook::Error>` — populated on `"failed"` |
+
+`recipient_id`/`recipient_user_id` mirror the [BSUID](#business-scoped-user-ids-bsuid)
+behavior above: `recipient_id` is present when you sent the message to a phone number
+(or when the recipient's phone number is otherwise available), and `recipient_user_id`
+is present when you sent it to their BSUID — either can be absent depending on how the
+message was addressed.
 
 ```ruby
 status.conversation.id                    # => "6ceb9d9"

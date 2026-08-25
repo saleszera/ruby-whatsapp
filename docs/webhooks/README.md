@@ -4,6 +4,11 @@ Meta pushes inbound messages, delivery statuses, and ~18 other account and templ
 notifications to a callback URL you register. This directory covers the *inbound*
 direction — the opposite of everything under [../messages/](../messages/README.md).
 
+> **Business-scoped user IDs (BSUID).** Meta is rolling out usernames, after which a
+> WhatsApp user's phone number may stop appearing in webhooks entirely. `Contact`,
+> `Message::Base`, and `Status` all carry BSUID fallback identifiers now — see
+> [messages.md's BSUID section](messages.md#business-scoped-user-ids-bsuid).
+
 > **Two different things.** `Whatsapp::Webhook` deserializes notifications once Meta is
 > already sending them. Turning that delivery **on** for a WhatsApp Business Account is
 > [`Whatsapp::SubscribedApp`](../subscribed_app/README.md). You need both.
@@ -128,7 +133,7 @@ change.field                             # => "messages"
 change.value                             # => #<Whatsapp::Webhook::Messages ...>
 ```
 
-`change.field` is one of Meta's 19 documented field names; `change.value` is that
+`change.field` is one of Meta's 21 documented field names; `change.value` is that
 field's deserialized payload, resolved through a frozen `Change::FIELDS` registry —
 **never `const_get` on the field name**, since it comes straight off the internet.
 
@@ -142,11 +147,13 @@ change.value["some_key"]    # reach into the raw hash
 change.value.to_h           # the whole thing
 ```
 
-## The 19 fields
+## The 21 fields
 
 | Field | Page | Confidence |
 | --- | --- | --- |
 | `messages` | [messages.md](messages.md) | **Confirmed** — Meta publishes a real payload |
+| `user_id_update` | [user_id_update.md](user_id_update.md) | **Confirmed** — Meta publishes a real payload |
+| `business_username_updates` | [business_username_updates.md](business_username_updates.md) | **Confirmed** — Meta publishes a real payload |
 | `account_alerts` | [account_alerts.md](account_alerts.md) | Moderate |
 | `account_review_update` | [account_review_update.md](account_review_update.md) | High |
 | `account_update` | [account_update.md](account_update.md) | Moderate |
@@ -166,11 +173,11 @@ change.value.to_h           # the whole thing
 | `template_category_update` | [template_category_update.md](template_category_update.md) | Moderate-high |
 | `user_preferences` | [user_preferences.md](user_preferences.md) | Moderate |
 
-> **On confidence.** Only `messages` has a Meta-published JSON example. The other 18
-> field classes are reconstructed from the one-line descriptions in Meta's docs plus
-> general Cloud API knowledge. They are real, tested classes — but validate one against
-> a real payload (App Dashboard → "send test payload") before depending on it in
-> production.
+> **On confidence.** `messages`, `user_id_update`, and `business_username_updates` each
+> have a Meta-published JSON example. The other 18 field classes are reconstructed from
+> the one-line descriptions in Meta's docs plus general Cloud API knowledge. They are
+> real, tested classes — but validate one against a real payload (App Dashboard → "send
+> test payload") before depending on it in production.
 
 ## Dispatching
 
