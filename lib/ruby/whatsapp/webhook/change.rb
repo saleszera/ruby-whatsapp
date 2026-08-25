@@ -2,7 +2,7 @@
 
 module Whatsapp
   module Webhook
-    # A single `entry[].changes[]` item: `field` names which of Meta's ~19 documented
+    # A single `entry[].changes[]` item: `field` names which of Meta's ~21 documented
     # webhook notification types this is, `value` is the deserialized payload for it.
     #
     # `FIELDS` is populated incrementally as each field's value class is implemented
@@ -17,6 +17,7 @@ module Whatsapp
         account_update: AccountUpdate,
         automatic_events: AutomaticEvents,
         business_capability_update: BusinessCapabilityUpdate,
+        business_username_updates: BusinessUsernameUpdates,
         history: History,
         message_template_components_update: MessageTemplateComponentsUpdate,
         message_template_quality_update: MessageTemplateQualityUpdate,
@@ -29,6 +30,7 @@ module Whatsapp
         smb_app_state_sync: SmbAppStateSync,
         smb_message_echoes: SmbMessageEchoes,
         template_category_update: TemplateCategoryUpdate,
+        user_id_update: UserIdUpdate,
         user_preferences: UserPreferences,
       }.freeze
 

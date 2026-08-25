@@ -30,6 +30,31 @@ RSpec.describe Whatsapp::Webhook::Message::Contacts::Contact do
       expect(contact.addresses).to eq([])
       expect(contact.urls).to eq([])
       expect(contact.org).to be_nil
+      expect(contact.vcard).to be_nil
+      expect(contact.origin).to be_nil
+    end
+
+    it "maps vcard and origin when the card was shared via a REQUEST_CONTACT_INFO button" do
+      contact = described_class.deserialize(
+        "name" => { "first_name" => "Jane", "last_name" => "Doe", "formatted_name" => "Jane Doe" },
+        "phones" => [{ "phone" => "12185551765", "wa_id" => "12185551765", "type" => "MOBILE" }],
+        "vcard" => nil,
+        "origin" => "contact_request"
+      )
+
+      expect(contact.vcard).to be_nil
+      expect(contact.origin).to eq("contact_request")
+    end
+
+    it "maps a non-nil vcard when the card was shared directly from the chat" do
+      contact = described_class.deserialize(
+        "name" => { "formatted_name" => "Jane Doe" },
+        "vcard" => "BEGIN:VCARD\nEND:VCARD",
+        "origin" => "other"
+      )
+
+      expect(contact.vcard).to eq("BEGIN:VCARD\nEND:VCARD")
+      expect(contact.origin).to eq("other")
     end
   end
 end

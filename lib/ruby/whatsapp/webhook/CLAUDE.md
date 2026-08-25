@@ -12,7 +12,7 @@ This directory deserializes and authenticates *inbound* Meta webhook notificatio
 { object, entry: [ { id, changes: [ { field, value } ] } ] }
 ```
 
-`Notification.deserialize(JSON.parse(body))` → `Entry[]` → `Change[]`. Each `Change#field` is one of Meta's ~19 documented webhook field names; `Change#value` is that field's deserialized payload, resolved through `Change::FIELDS` — a frozen `Symbol => Class` hash, the same dispatch-table convention as `Messages::KINDS` and `Interactive::ACTION_TYPES` (**never `const_get` on the field name** — it comes straight from the internet). A field not in `FIELDS` (something Meta adds after this gem is released) falls back to `UnknownField` rather than raising, so the controller never 500s on an unrecognized notification.
+`Notification.deserialize(JSON.parse(body))` → `Entry[]` → `Change[]`. Each `Change#field` is one of Meta's ~21 documented webhook field names; `Change#value` is that field's deserialized payload, resolved through `Change::FIELDS` — a frozen `Symbol => Class` hash, the same dispatch-table convention as `Messages::KINDS` and `Interactive::ACTION_TYPES` (**never `const_get` on the field name** — it comes straight from the internet). A field not in `FIELDS` (something Meta adds after this gem is released) falls back to `UnknownField` rather than raising, so the controller never 500s on an unrecognized notification.
 
 ## Conventions
 
@@ -25,14 +25,21 @@ Every deserializable class here follows the `Messages::Response` read-side patte
 
 ### The `messages` field — full typed coverage
 
-`Whatsapp::Webhook::Messages` is the only field with a confirmed, JSON-example-backed schema (Meta's docs show a real payload). It composes:
+`Whatsapp::Webhook::Messages` is one of three fields with a confirmed, JSON-example-backed schema (Meta's docs show a real payload — see also `UserIdUpdate`/`BusinessUsernameUpdates` below). It composes:
 
 - `Metadata` (`display_phone_number`, `phone_number_id`)
-- `Contact` (`profile_name`, `wa_id`) — the *value-level* `contacts[]` entry, distinct from `Message::Contacts` below
-- `Message` — a dispatcher (like `Whatsapp::Messages`, not inherited) resolving `messages[]` entries by `type` through `Message::MESSAGE_TYPES`, to a subclass of `Message::Base` (holds the shared envelope: `from`, `id`, `timestamp`, `type`, `context`, `referral`):
-  - `Text`, `Image`/`Video`/`Audio`/`Document`/`Sticker` (share a `Media < Base` superclass: `media_id`, `mime_type`, `sha256`, `caption`), `Location`, `Contacts` (+ nested `Contact`/`Name`/`Phone`/`Email`/`Address`/`Org`/`Url`, mirroring `Messages::Contacts::*` field-for-field but as new read-side classes), `Interactive` (`button_reply`/`list_reply`), `Button`, `Order` (+ `ProductItem`), `System`, `Reaction`, and `Unknown` (fallback — carries `errors[]` and the full raw hash)
-- `Status` — delivery status updates (`sent`/`delivered`/`read`/`failed`), with nested `Conversation` and `Pricing`
+- `Contact` (`profile_name`, `username`, `wa_id`, `user_id`, `parent_user_id`) — the *value-level* `contacts[]` entry, distinct from `Message::Contacts` below. `username`/`user_id`/`parent_user_id` are the [Business-Scoped User ID (BSUID)](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids) fields; `wa_id` can be `nil` once a user adopts a username and their phone number is no longer shareable, but `user_id` is always present.
+- `Message` — a dispatcher (like `Whatsapp::Messages`, not inherited) resolving `messages[]` entries by `type` through `Message::MESSAGE_TYPES`, to a subclass of `Message::Base` (holds the shared envelope: `from`, `from_user_id`, `from_parent_user_id`, `id`, `timestamp`, `type`, `context`, `referral` — the BSUID fields are extracted once in `Base.common_attributes` so every subclass gets them for free):
+  - `Text`, `Image`/`Video`/`Audio`/`Document`/`Sticker` (share a `Media < Base` superclass: `media_id`, `mime_type`, `sha256`, `caption`), `Location`, `Contacts` (+ nested `Contact`/`Name`/`Phone`/`Email`/`Address`/`Org`/`Url`/`birthday`, plus BSUID-adjacent `vcard`/`origin` for cards shared via a `REQUEST_CONTACT_INFO` button, mirroring `Messages::Contacts::*` field-for-field but as new read-side classes), `Interactive` (`button_reply`/`list_reply`), `Button`, `Order` (+ `ProductItem`), `System` (+ its own `user_id`/`parent_user_id` for the customer's *new* BSUID after a `user_changed_user_id` event), `Reaction`, and `Unknown` (fallback — carries `errors[]` and the full raw hash)
+- `Status` — delivery status updates (`sent`/`delivered`/`read`/`failed`), with nested `Conversation` and `Pricing`, plus `recipient_user_id`/`recipient_parent_user_id` alongside `recipient_id` for the same BSUID reason as `Contact`
 - `Error` (top-level `Webhook::Error`, shared between `Message::Unknown#errors` and `Status#errors`)
+
+### Two more confirmed fields: `UserIdUpdate` and `BusinessUsernameUpdates`
+
+Both are part of the same BSUID rollout as the `messages` field above, and both ship with a real Meta JSON example:
+
+- `UserIdUpdate` (field `user_id_update`) — a user's BSUID changed. Composes the same `Metadata`/`Contact` as `Messages`, plus `updates: Array<UserIdUpdate::Entry>` (`wa_id`, `detail`, `timestamp`, and `user_id`/`parent_user_id` as `UserIdUpdate::IdChange { previous, current }` — one shared value class for both, since they're the identical shape).
+- `BusinessUsernameUpdates` (field `business_username_updates`) — a business phone number's username moved between `approved`/`reserved`/`deleted`. Flat class (`display_phone_number`, `username`, `status`); `status` stays a raw string, no enum/predicates, matching this module's convention (see `MessageTemplateStatusUpdate#event`, `AccountUpdate#event`) rather than the write-side `BusinessPhoneNumber::Account::Details` convention.
 
 ### The other 18 fields — best-effort typed classes
 

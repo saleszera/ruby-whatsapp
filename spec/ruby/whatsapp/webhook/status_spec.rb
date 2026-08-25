@@ -26,6 +26,8 @@ RSpec.describe Whatsapp::Webhook::Status do
       expect(status.pricing.category).to eq("service")
       expect(status.errors.first).to be_a(Whatsapp::Webhook::Error)
       expect(status.errors.first.code).to eq(131_026)
+      expect(status.recipient_user_id).to be_nil
+      expect(status.recipient_parent_user_id).to be_nil
     end
 
     it "tolerates missing conversation, pricing, and errors" do
@@ -34,6 +36,20 @@ RSpec.describe Whatsapp::Webhook::Status do
       expect(status.conversation).to be_nil
       expect(status.pricing).to be_nil
       expect(status.errors).to eq([])
+    end
+
+    it "maps recipient_user_id and recipient_parent_user_id, omitting recipient_id, when sent to a BSUID" do
+      status = described_class.deserialize(
+        "id" => "ABGGFlA5Fpa",
+        "status" => "sent",
+        "timestamp" => "1504902988",
+        "recipient_user_id" => "US.13491208655302741918",
+        "recipient_parent_user_id" => "US.ENT.11815799212886844830"
+      )
+
+      expect(status.recipient_id).to be_nil
+      expect(status.recipient_user_id).to eq("US.13491208655302741918")
+      expect(status.recipient_parent_user_id).to eq("US.ENT.11815799212886844830")
     end
   end
 end

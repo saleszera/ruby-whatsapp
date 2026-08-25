@@ -18,5 +18,21 @@ RSpec.describe Whatsapp::Webhook::Message::System do
       expect(message.wa_id).to eq("16505551234")
       expect(message.change_type).to eq("customer_changed_number")
     end
+
+    it "maps the system's new user_id and parent_user_id after a BSUID change" do
+      message = described_class.deserialize(
+        "type" => "system",
+        "system" => {
+          "body" => "User Jane changed from US.OLD to US.NEW",
+          "wa_id" => "16505551234",
+          "user_id" => "US.NEW",
+          "parent_user_id" => "US.ENT.NEW",
+          "type" => "user_changed_user_id",
+        }
+      )
+
+      expect(message.user_id).to eq("US.NEW")
+      expect(message.parent_user_id).to eq("US.ENT.NEW")
+    end
   end
 end
