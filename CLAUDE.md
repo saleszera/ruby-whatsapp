@@ -95,7 +95,8 @@ All message classes validate `:to` (recipient phone number) and implement `seria
 
 **Webhooks (inbound):** `Whatsapp::Webhook` deserializes Meta's incoming webhook notifications — the opposite direction from everything above. See `lib/ruby/whatsapp/webhook/CLAUDE.md` for the full dispatch-table conventions and field reference; in short:
 
-- `Whatsapp::Webhook::Notification.deserialize(JSON.parse(body))` → `Entry[]` → `Change[]` (`field` + `value`), dispatched through a frozen `FIELDS` registry (mirrors `Messages::KINDS`) to one class per Meta-documented field. Only `messages` has a confirmed schema; the other 18 are best-effort.
+- `Whatsapp::Webhook::Notification.deserialize(JSON.parse(body))` → `Entry[]` → `Change[]` (`field` + `value`), dispatched through a frozen `FIELDS` registry (mirrors `Messages::KINDS`) to one class per Meta-documented field. `messages`, `user_id_update`, and `business_username_updates` have a confirmed schema; the other 18 are best-effort.
+- Business-Scoped User IDs (BSUID): `messages`' `Contact`/`Message::Base`/`Status` all carry `user_id`/`from_user_id`/`recipient_user_id` (plus `parent_user_id` variants) alongside the phone-number identifiers, since a WhatsApp user's phone number can be absent once they adopt a username. See `lib/ruby/whatsapp/webhook/CLAUDE.md` and `docs/webhooks/messages.md#business-scoped-user-ids-bsuid`.
 - `Whatsapp::Webhook::Verification.call(params:)` / `Whatsapp::Webhook::Signature.valid?(payload:, header:)` handle the GET handshake and the `X-Hub-Signature-256` HMAC check, both defaulting to `Whatsapp.configuration.verify_token`/`app_secret` but overridable per call (for multi-tenant apps with per-account credentials).
 - `rake whatsapp:install:webhook` (via `Whatsapp::Railtie`, only active when Rails is loaded) copies a personalizable `app/controllers/whatsapp/webhooks_controller.rb` into the host app using `Whatsapp::Webhook::Installer`.
 
