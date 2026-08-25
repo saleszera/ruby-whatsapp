@@ -1,3 +1,25 @@
+## [0.5.0] - 2026-08-24
+
+- Add Business-Scoped User ID (BSUID) support to inbound webhooks: Meta is rolling out
+  WhatsApp usernames, after which a user's phone number can be omitted from a webhook
+  entirely, leaving their BSUID (`user_id`, e.g. `"US.13491208655302741918"`) as the only
+  stable identifier. `Whatsapp::Webhook::Contact`, `Message::Base` (and therefore every
+  message type: `Text`, the `Media` family, `Location`, `Contacts`, `Interactive`,
+  `Button`, `Order`, `System`, `Reaction`, `Unknown`), and `Status` now all carry
+  `user_id`/`from_user_id`/`recipient_user_id`, alongside `parent_user_id` variants for
+  businesses enrolled in [parent BSUIDs](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids#parent-business-scoped-user-ids).
+  `Contact` additionally gains `username`. `Message::Contacts::Contact` gains `vcard`/
+  `origin` for cards shared via a `REQUEST_CONTACT_INFO` button, and `Message::System`
+  gains its own `user_id`/`parent_user_id` for the customer's new BSUID after a
+  `user_changed_user_id` event. `from_user_id`/`from_parent_user_id` are extracted once
+  in `Message::Base.common_attributes`, so every message type gained them without any
+  per-type changes.
+- Add two new confirmed webhook fields from the same BSUID rollout:
+  `Whatsapp::Webhook::UserIdUpdate` (a user's BSUID changed — composes the existing
+  `Metadata`/`Contact` plus `Entry`/`IdChange` for the `{previous, current}` change
+  records) and `Whatsapp::Webhook::BusinessUsernameUpdates` (a business phone number's
+  username moved between `approved`/`reserved`/`deleted`).
+
 ## [0.4.2] - 2026-08-19
 
 - Add WhatsApp Business Profile management: `Whatsapp::BusinessPhoneNumber::Profile::Get` reads the public card a WhatsApp user sees before they reply — about text, description, address, email, websites, industry vertical, and profile picture URL — and `::Profile::Update` writes them. Unlike `::Account`, this is not an exception to the module's `phone_id` rule: Meta exposes the profile as an edge on the phone number itself (`GET`/`POST /{phone_id}/whatsapp_business_profile`), so both actions reuse the existing `BusinessPhoneNumber::Transport#edge_path` unchanged — no new transport, no new ID to configure. `Update` validates the 21-value `Profile::Verticals` enum and Meta's documented limits (about 139, address 256, description 512, email 128 characters, at most 2 websites) before any request is made, and compacts omitted fields out of the body rather than sending null — which Meta reads as an instruction to blank them — with an empty `websites` array surviving on purpose, since that is how the list is cleared. `email`'s format is deliberately left to Meta, which validates it server-side; a regex here would reject valid exotic addresses. It reuses the existing `BusinessPhoneNumber::Response`, since the endpoint answers a bare `{success}`.
