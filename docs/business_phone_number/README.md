@@ -27,6 +27,11 @@ Addresses your **phone number** (`phone_id`, not `waba_id`), like
 > and picture. Those address your phone number (`phone_id`), just like the four actions
 > below.
 
+> **Looking for the username?** [`Username::Get` / `Claim` / `Delete` / `Suggest`](username.md)
+> read and set the searchable `@name` a WhatsApp user can find the number by, and
+> [`ContactBook::Delete`](contact_book.md) forgets a stored user contact. Both address
+> `phone_id`, like the four actions below.
+
 > **Unrelated to [`SubscribedApp`](../subscribed_app/README.md).** That turns *webhook
 > delivery* on and off for a whole WhatsApp Business Account. This is per phone number
 > and has nothing to do with notifications.
@@ -55,6 +60,11 @@ Whatsapp::BusinessPhoneNumber::Deregister.call
 | [`Account::Update.call(name:, timezone_id:)`](account.md) | `POST /{waba_id}` | `Response` |
 | [`Profile::Get.call(fields:)`](profile.md) | `GET /{phone_id}/whatsapp_business_profile` | `Profile::Details` |
 | [`Profile::Update.call(**fields)`](profile.md) | `POST /{phone_id}/whatsapp_business_profile` | `Response` |
+| [`Username::Get.call`](username.md) | `GET /{phone_id}/username` | `Username::Details` |
+| [`Username::Claim.call(username:, transfer_action:)`](username.md) | `POST /{phone_id}/username` | `Username::Details` |
+| [`Username::Delete.call`](username.md) | `DELETE /{phone_id}/username` | `Response` |
+| [`Username::Suggest.call`](username.md) | `GET /{phone_id}/username_suggestions` | `Username::Suggestions` |
+| [`ContactBook::Delete.call(bsuid:)`](contact_book.md) | `DELETE /{phone_id}/contact_book` | `ContactBook::Deletion` |
 
 Every action accepts an optional `client:` and raises
 `Whatsapp::BusinessPhoneNumber::Error` if `phone_id` is missing or the API rejects the
@@ -221,7 +231,8 @@ Local validation failures raise `ActiveModel::ValidationError` before any reques
 ---
 
 **See also:** [Reading and updating the business account](account.md) ·
-[Reading and updating the business profile](profile.md)
+[Reading and updating the business profile](profile.md) ·
+[Business usernames](username.md) · [Contact book](contact_book.md)
 
 ---
 
