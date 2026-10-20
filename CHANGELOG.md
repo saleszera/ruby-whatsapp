@@ -1,4 +1,4 @@
-## [Unreleased]
+## [0.6.0] - 2026-10-20
 
 Completes the Business-Scoped User ID (BSUID) work that 0.5.0 began. 0.5.0 covered the
 inbound webhook half; this covers the send side, the four webhook fields Meta's BSUID
