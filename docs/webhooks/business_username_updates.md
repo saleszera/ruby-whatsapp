@@ -33,9 +33,22 @@ publishes a real JSON example
 ```ruby
 when "business_username_updates"
   update = change.value
-  PhoneNumber.find_by(display_phone_number: update.display_phone_number)
-             &.update!(username: update.username, username_status: update.status)
+  digits = update.display_phone_number.to_s.gsub(/\D/, "")
+  number = PhoneNumber.find_by(display_phone_number_digits: digits)
+
+  if number
+    number.update!(username: update.username, username_status: update.status)
+  else
+    Rails.logger.error("[whatsapp] no PhoneNumber matching #{update.display_phone_number.inspect}")
+  end
 ```
+
+This field carries no `phone_number_id`, so `display_phone_number` is the only join key
+you get — and Meta formats it for display, inconsistently (`"15550783881"` in one payload,
+`"+1 555-078-3881"` in another). Match on digits, and report a miss instead of letting
+`&.update!` swallow it: a silent no-op means you never learn the username moved. Log or
+alert; do not `raise`, or a permanent formatting mismatch puts Meta into a retry loop
+against a request that can never succeed. `update.raw` carries the untouched payload.
 
 ---
 

@@ -45,11 +45,15 @@ BSUIDs](https://developers.facebook.com/documentation/business-messaging/whatsap
 | --- | --- |
 | `wa_id` | The user's phone number, if available |
 | `detail` | Human-readable description of the change |
-| `user_id` | `Entry::IdChange` — the user's previous and current BSUID |
-| `parent_user_id` | `Entry::IdChange` or `nil` — previous and current parent BSUID |
+| `user_id` | `UserIdUpdate::IdChange` or `nil` — the user's previous and current BSUID |
+| `parent_user_id` | `UserIdUpdate::IdChange` or `nil` — previous and current parent BSUID |
 | `timestamp` | Unix seconds, as a String |
 
 ### `IdChange`
+
+`Whatsapp::Webhook::UserIdUpdate::IdChange` — a sibling of `Entry`, not nested inside it.
+One class serves both `user_id` and `parent_user_id`, since they are the same shape, and
+each is `nil` rather than an all-nil object when its key is absent.
 
 | Accessor | Meaning |
 | --- | --- |
@@ -61,9 +65,19 @@ BSUIDs](https://developers.facebook.com/documentation/business-messaging/whatsap
 ```ruby
 when "user_id_update"
   change.value.updates.each do |update|
-    User.find_by(bsuid: update.user_id.previous)&.update!(bsuid: update.user_id.current)
+    next unless update.user_id  # nil when the entry carries only a parent BSUID change
+
+    user = User.find_by(bsuid: update.user_id.previous)
+    next Rails.logger.warn("[whatsapp] unknown BSUID #{update.user_id.previous}") unless user
+
+    user.update!(bsuid: update.user_id.current)
   end
 ```
+
+Report a miss rather than letting `&.update!` swallow it — a rotation you never applied
+leaves you writing to a dead BSUID with no diagnostics. Log or alert; do not `raise`, or
+Meta will retry a request that can never succeed. `change.value.raw` carries the untouched
+payload if you need to see what actually arrived.
 
 ---
 

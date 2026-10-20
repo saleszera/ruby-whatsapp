@@ -1,11 +1,12 @@
 # `messages`
 
 Inbound customer messages and outbound delivery statuses — the field you will spend
-almost all your time on, and one of only three fields with a Meta-published JSON
+almost all your time on, and one of only five fields with a Meta-published JSON
 schema (alongside [`user_id_update`](user_id_update.md) and
 [`business_username_updates`](business_username_updates.md)).
 
-`Whatsapp::Webhook::Messages`
+`Whatsapp::Webhook::Messages` · confidence: **confirmed** — Meta publishes a real JSON
+example
 
 ## A full notification
 
@@ -68,7 +69,12 @@ Once a WhatsApp user adopts a username, their phone number may stop appearing in
 webhooks — `wa_id`/`from`/`recipient_id` are omitted, and the only stable identifier
 left is their **business-scoped user ID** (BSUID), a country-code-prefixed string like
 `"US.13491208655302741918"` assigned to `user_id`/`from_user_id`/`recipient_user_id`.
-It is always present, regardless of whether a username has been adopted. A
+Meta sends `user_id`/`from_user_id` with every contact entry and inbound message in its
+published examples, whether or not a username has been adopted, and sends
+`recipient_user_id` on every delivery status regardless of how you addressed the
+message — see [what arrives with which status](#what-arrives-with-which-status) for the
+one exception. All of
+them deserialize to `nil` rather than raising when absent, so read them as optional. A
 `parent_user_id`/`from_parent_user_id`/`recipient_parent_user_id` variant additionally
 appears if you have enrolled in [parent BSUIDs](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids#parent-business-scoped-user-ids)
 (shared across business portfolios). See
@@ -78,7 +84,7 @@ for the full rollout details.
 ```ruby
 contact = value.contacts.first
 contact.wa_id           # => "16315551181"  or nil once phone number sharing stops
-contact.user_id         # => "US.13491208655302741918" — always present
+contact.user_id         # => "US.13491208655302741918" — sent with every contact entry
 contact.username        # => "@testusername" or nil — set only once adopted
 contact.parent_user_id  # => set only when parent BSUIDs are enabled
 ```
@@ -96,8 +102,9 @@ All message classes share this envelope from `Message::Base`:
 | Accessor | Meaning |
 | --- | --- |
 | `from` | The customer's WhatsApp ID, or `nil` once they adopt a username (see [BSUID](#business-scoped-user-ids-bsuid)) |
-| `from_user_id` | The customer's BSUID — always present |
+| `from_user_id` | The customer's BSUID — sent on every inbound message; `nil` if absent |
 | `from_parent_user_id` | The customer's parent BSUID, present only if enabled |
+| `group_id` | Set only if the message was sent in a group chat; `nil` otherwise |
 | `id` | The WAMID — pass it to [`mark_message_as_read!`](../messages/mark_message_as_read.md) |
 | `timestamp` | Unix seconds, as a String |
 | `type` | `"text"`, `"image"`, … |
@@ -306,6 +313,52 @@ message.message_id  # => "wamid.OLD"  — the message being reacted to
 message.emoji       # => "👍"          — empty String when a reaction is removed
 ```
 
+### Revoke
+
+The customer deleted a message they had sent you. A *control* message rather than a
+content one: it names a message you already have instead of carrying a body.
+
+```json
+{ "from": "16505551234", "id": "wamid.HBg", "timestamp": "1749416383",
+  "type": "revoke", "revoke": { "original_message_id": "wamid.ORIGINAL" } }
+```
+
+```ruby
+message.original_message_id  # => "wamid.ORIGINAL" — the message to delete on your side
+message.id                   # => "wamid.HBg" — the revoke notification's own wamid
+```
+
+Also arrives through [`smb_message_echoes`](smb_message_echoes.md) when the *business*
+revokes a message from the WhatsApp Business app.
+
+### Edit
+
+The customer edited a message they had sent you. Names the message being replaced and
+carries the replacement content.
+
+```json
+{ "from": "16505551234", "id": "wamid.HBg", "timestamp": "1749416383",
+  "type": "edit",
+  "edit": { "original_message_id": "wamid.ORIGINAL",
+            "message": { "context": { "id": "wamid.CONTEXT" },
+                         "type": "image",
+                         "image": { "caption": "Now in blue", "id": "media.1" } } } }
+```
+
+```ruby
+message.original_message_id  # => "wamid.ORIGINAL"
+message.message              # => #<Whatsapp::Webhook::Message::Image ...>
+message.message.caption      # => "Now in blue"
+```
+
+`message` is a full nested `Message::*`, dispatched by its own `type` — so an edited
+image behaves exactly like an inbound one. It carries **content only**: the nested
+payload has no `from`/`id`/`timestamp` of its own, so those read `nil`. Use the outer
+`message.id` and `message.from`.
+
+Also arrives through [`smb_message_echoes`](smb_message_echoes.md) when the *business*
+edits a message from the WhatsApp Business app.
+
 ### Unknown
 
 The fallback for a type this gem doesn't model — including anything Meta flags as
@@ -331,13 +384,22 @@ Present when the customer replied to, or forwarded, a message.
 
 ```ruby
 message.context&.id                    # => "wamid.HBg..."  — the message replied to
-message.context&.from                  # => the sender of that message
+message.context&.from                  # => the sender of that message, or nil once
+                                       #    they adopt a username
+message.context&.from_user_id          # => that sender's BSUID
+message.context&.from_parent_user_id   # => their parent BSUID, if enrolled
 message.context&.forwarded             # => true | false
 message.context&.frequently_forwarded  # => true | false
 ```
 
 `context` is `nil` — not an all-nil object — when the key is absent, so `&.` is the
 right idiom.
+
+`from_user_id`/`from_parent_user_id` carry the quoted sender's identity when their phone
+number is gone, the same way [`from_user_id` does on the message itself](#business-scoped-user-ids-bsuid).
+**Their key names are inferred** by symmetry with `Message::Base` — Meta has not published
+a `context` example carrying them, so validate against a real payload before depending on
+them.
 
 ## Referral
 
@@ -383,17 +445,40 @@ status.recipient_id  # => "16505551234", or nil once sent to a BSUID (see below)
 
 | Accessor | Type |
 | --- | --- |
-| `recipient_user_id` | The recipient's BSUID |
+| `recipient_user_id` | The recipient's BSUID — sent on every status; see the table below for the `failed` exception |
 | `recipient_parent_user_id` | The recipient's parent BSUID, present only if enabled |
 | `conversation` | `Status::Conversation` — `id`, `origin_type`, `expiration_timestamp` |
 | `pricing` | `Status::Pricing` — `billable`, `pricing_model`, `category` |
 | `errors` | `Array<Webhook::Error>` — populated on `"failed"` |
 
-`recipient_id`/`recipient_user_id` mirror the [BSUID](#business-scoped-user-ids-bsuid)
-behavior above: `recipient_id` is present when you sent the message to a phone number
-(or when the recipient's phone number is otherwise available), and `recipient_user_id`
-is present when you sent it to their BSUID — either can be absent depending on how the
-message was addressed.
+`recipient_id` is present when you sent the message to a phone number (or when the
+recipient's phone number is otherwise available). `recipient_user_id` is **not** the
+mirror image of that: Meta sends it on every status whatever you addressed, so the two
+routinely arrive together.
+
+### What arrives with which status
+
+| | `sent` | `delivered` | `read` | `failed` |
+| --- | :---: | :---: | :---: | :---: |
+| `recipient_user_id` | always | always | always | only if addressed to a BSUID |
+| `contacts[]` | yes | yes | yes | **omitted entirely** |
+| `contacts[].profile.username` | omitted | if adopted | if adopted | — |
+| `errors` | — | — | — | populated |
+
+Two traps in that table. A `failed` status is the only one that arrives with no
+`contacts` array at all, so code that reads `value.contacts.first` while handling
+failures must tolerate `nil` — `contacts` is always an Array, but an empty one. And a
+`failed` status for a message you addressed to a phone number carries **neither**
+identifier beyond `recipient_id`, so a BSUID-keyed lookup has to fall back to the phone
+number on that path.
+
+```ruby
+# Correlating a failure back to a customer, whichever identifier arrived
+status = value.statuses.first
+customer =
+  Customer.find_by(bsuid: status.recipient_user_id) ||
+  Customer.find_by(wa_id: status.recipient_id)
+```
 
 ```ruby
 status.conversation.id                    # => "6ceb9d9"
