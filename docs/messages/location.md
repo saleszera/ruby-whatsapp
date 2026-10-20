@@ -17,7 +17,7 @@ Whatsapp::Messages.send_location!(
 
 | Field | Required | Rules |
 | --- | --- | --- |
-| `to` | yes | The recipient's phone number |
+| `to` / `recipient` | at least one | Phone number and/or [BSUID](README.md#addressing-to-recipient-or-both) |
 | `latitude` | yes | Numeric |
 | `longitude` | yes | Numeric |
 | `name` | no | Label shown above the pin |

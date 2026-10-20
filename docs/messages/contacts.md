@@ -15,7 +15,7 @@ Whatsapp::Messages.send_contacts!(
 
 | Field | Required | Rules |
 | --- | --- | --- |
-| `to` | yes | The recipient's phone number |
+| `to` / `recipient` | at least one | Phone number and/or [BSUID](README.md#addressing-to-recipient-or-both) |
 | `contacts` | yes | An array containing **exactly one** contact |
 
 > **Exactly one contact.** The Cloud API currently accepts a single contact per

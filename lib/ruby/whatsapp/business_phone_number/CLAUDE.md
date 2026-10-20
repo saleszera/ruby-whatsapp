@@ -20,16 +20,22 @@ RequestCode  ->  VerifyCode  ->  Register            (onboarding)
 Deregister                                            (the reverse switch)
 ```
 
-Alongside that flow, two sub-namespaces describe things *about* the number rather than its
+Alongside that flow, four sub-namespaces describe things *about* the number rather than its
 onboarding state:
 
 - `Profile` reads and updates the business profile a WhatsApp user sees — the public card:
   about line, description, address, email, websites, vertical, picture. Addresses
   `phone_id`, exactly like the onboarding actions.
+- `Username` reads, claims, and deletes the searchable `@name` a WhatsApp user can find the
+  number by. Addresses `phone_id`, and is the first sub-namespace here to address *two*
+  edges (`username` and `username_suggestions`).
+- `ContactBook` deletes a stored user contact — the store Meta uses to keep putting a user's
+  phone number in your webhooks after they adopt a username. Addresses `phone_id`, though
+  what it affects is scoped to the whole business portfolio.
 - `Account` reads and updates the WhatsApp Business Account the number belongs to — the one
   part of this directory that addresses `waba_id` rather than `phone_id`.
 
-See "Why `Account` and `Profile` live here" below.
+See "Why `Account` and `Profile` live here" below, which now covers four sub-namespaces.
 
 Source:
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/registration
@@ -82,6 +88,16 @@ BusinessPhoneNumber              module doc + Error (Whatsapp::BusinessPhoneNumb
   │     ├── Details              messaging_product, about, address, description, email,
   │     │                        profile_picture_url, websites, vertical
   │     └── Verticals            the 21-value enum, shared by Update and Details
+  ├── Username                   the searchable @name — phone_id, via the SAME Transport
+  │     ├── Get                  GET    /{phone_id}/username             -> Username::Details
+  │     ├── Claim                POST   /{phone_id}/username             -> Username::Details
+  │     ├── Delete               DELETE /{phone_id}/username             -> Response (reused)
+  │     ├── Suggest              GET    /{phone_id}/username_suggestions -> Username::Suggestions
+  │     ├── Details              username, status + Statuses, #approved?, #reserved?
+  │     └── Suggestions          Enumerable; owns the {data:[{username_suggestions:[]}]} envelope
+  ├── ContactBook                stored user contacts — phone_id, via the SAME Transport
+  │     ├── Delete               DELETE /{phone_id}/contact_book -> ContactBook::Deletion
+  │     └── Deletion             messaging_product, success, deleted
   └── Account                    the WABA node — waba_id, not phone_id
         ├── Transport            node_path(client), waba_id, NO edge segment
         ├── Get                  GET  /{waba_id}  -> Account::Details
@@ -90,21 +106,25 @@ BusinessPhoneNumber              module doc + Error (Whatsapp::BusinessPhoneNumb
 ```
 
 `Transport` is `extend`ed (not `include`d) by all four onboarding action classes **and by
-`Profile::Get`/`Profile::Update`**, mirroring `SubscribedApp::Transport`. Addresses
-`client.phone_id`, like `Media` and `Messages`. There are only two transports in this
-directory — `Profile` needed none, since its endpoint is a phone-number-scoped *edge*, which
-is exactly what `edge_path` already builds. Both transports `include`
+every action under `Profile`, `Username`, and `ContactBook`**, mirroring
+`SubscribedApp::Transport`. Addresses `client.phone_id`, like `Media` and `Messages`. There
+are still only two transports in this directory, three sub-namespaces later — each of those
+endpoints is a phone-number-scoped *edge*, which is exactly what `edge_path` already builds.
+`Username` is the proof that taking the edge as an argument was right: it is the first
+sub-namespace with two of them. Both transports `include`
 `Whatsapp::PathBuilding` (`../path_building.rb`), the gem-wide mixin owning the guard and
 its wording.
 
-## Why `Account` and `Profile` live here
+## Why `Account`, `Profile`, `Username`, and `ContactBook` live here
 
-Both describe something *about* a phone number rather than its onboarding state, which is why they sit here. They are **not** the same kind of case, and the difference is worth keeping straight:
+All four describe something *about* a phone number rather than its onboarding state, which is why they sit here. They are **not** all the same kind of case, and the difference is worth keeping straight:
 
 | | Addresses | Own transport? |
 |---|---|---|
 | onboarding actions | `phone_id` + edge | no — `Transport#edge_path` |
 | `Profile` | `phone_id` + edge | **no** — reuses the very same `edge_path` |
+| `Username` | `phone_id` + **two** edges | **no** — same `edge_path`, called with each edge |
+| `ContactBook` | `phone_id` + edge | **no** — same `edge_path` |
 | `Account` | `waba_id`, no edge | yes — `Account::Transport#node_path` |
 
 ### `Account`
@@ -168,12 +188,99 @@ Two things about it are worth knowing:
 `MessageTemplates::Categories`' precedent rather than `Register::DataLocalizationRegions`',
 per convention 5 below.
 
+### `Username`
+
+The business half of Meta's usernames rollout, whose *user* half is what makes
+`Messages::Base#recipient` necessary. Not an exception to anything: both edges hang off the
+phone number, so `edge_path` is reused with a different `Defaults::EDGE` per action —
+`Register` → `"register"` is the same pattern.
+
+Four decisions worth recording:
+
+1. **Four endpoints, three wire shapes, two new classes, one reuse.** `GET` answers
+   `{username, status}` and `POST` answers `{status}` — a subset, not a different shape — so
+   one `Username::Details` covers both with `username` nil-tolerant, exactly as
+   `Response#id` is tolerant of only ever being set by `VerifyCode`. `DELETE` answers a bare
+   `{success}`, so it reuses `BusinessPhoneNumber::Response` (write it out in full at the
+   call site). Only `username_suggestions` is genuinely different, and it gets
+   `Username::Suggestions`.
+2. **`Suggestions` owns the doubly-wrapped envelope**, flattening
+   `{"data":[{"username_suggestions":[…]}]}` to a plain array, the same habit as
+   `Profile::Details#unwrap` and `SubscribedApp::Response::App`. Unlike `Profile::Details`,
+   which reads only `data[0]` because a phone number has exactly one profile, this
+   `flat_map`s across every entry: there is no equivalent "exactly one" argument, and
+   `flat_map` is identical for one entry while degrading correctly for more.
+3. **The status enum, reconciled with the webhook.** The *data* is raw on both sides —
+   neither `Details` nor `Webhook::BusinessUsernameUpdates` validates an incoming status,
+   which is the actual shared rule. What differs is whether the gem ships a comparison
+   vocabulary, and that tracks a real asymmetry: `approved` vs `reserved` is the documented
+   control flow of `Claim`, so callers branch on it here and get `Statuses` +
+   `#approved?`/`#reserved?` (the `Account::Details` convention); the webhook side never
+   branches, it persists, so it stays a raw string. **`Statuses::ALL` deliberately omits
+   `"deleted"`** — that value reaches you only through the webhook, and a write-side enum
+   must not name a state no endpoint here can return.
+4. **Naming.** `Claim`, not `Create`/`Update`/`Set`: posting again *replaces* the username,
+   `Update` would imply `Profile::Update`'s partial-update semantics, and `Set` would shadow
+   `::Set` inside the namespace. `Suggest` is the verb for the action and `Suggestions` the
+   noun for its result, which is also how the two avoid wanting the same name.
+
+Format validation follows convention 6 with one deliberate hole: Meta publishes the username
+rules as client-side ("will cause the request to fail"), so they belong here alongside
+`Register`'s PIN pattern — **except** the domain-suffix rule, whose published list ends in
+"and so on". `DOMAIN_SUFFIXES` catches the ten Meta names and lets anything else through to
+be rejected as error `100`; a longer local list would be inventing rules. Two judgment calls
+inside that, both pinned by specs: mixed case is **downcased** rather than rejected (Meta
+compares case-insensitively, so refusing a name it would have accepted is the failure this
+module avoids), and `www` is read as the **bare prefix** Meta writes, so `wwwidgets` is
+rejected too.
+
+`transfer_action` is the first enum here to emit lowercase, because that is what Meta
+documents — see the amended convention 5. It is always sent rather than compacted away at
+its default: convention 7's "nil means leave alone" is about *stored* fields, and this is a
+per-request behavior flag with nothing to leave alone.
+
+### `ContactBook`
+
+Also a `phone_id` edge, also no new transport. It sits here rather than in a top-level
+module for two reasons. First, this directory is the *administration of one number*, whereas
+`Whatsapp::Media` and `Whatsapp::Messages` are top-level because they are the traffic
+itself. Second, and decisively, a top-level `Whatsapp::ContactBook` would need its own error
+class for a single endpoint — one more class for users to learn and one more row in
+`docs/errors.md` — where living here means convention 3 still holds and one `rescue` covers
+the directory.
+
+Two things to know:
+
+1. **Its own response class.** `Deletion` carries `messaging_product`, `success`, **and**
+   `deleted`. Folding `deleted` into `BusinessPhoneNumber::Response` was tempting — that
+   class already absorbed `id` for `VerifyCode` — and is wrong: `id` is an identifier other
+   actions can ignore, whereas `deleted` is a second success-ish boolean that changes how
+   `success` reads (`success: true, deleted: false` means "worked, nothing was there"). Two
+   booleans on the class every onboarding action returns is where `SubscribedApp`'s warning
+   about forcing fields onto classes that lack them bites. Named `Deletion` rather than
+   `ContactBook::Response`, which would sit confusingly beside `BusinessPhoneNumber::Response`.
+2. **`#serialize` returns query parameters, not a body** — a first for this directory, since
+   the edge is a `DELETE`. The name is kept anyway, because convention 2 is literally "a
+   validated instance with a public `#serialize`", and having two names for one concept
+   across the directory would cost more than the mild surprise does.
+
+The parent-BSUID guard is the one BSUID-shape assertion anywhere in this gem, and is safe
+because it tests for a documented *extra segment* rather than a country-code grammar Meta
+has never published: `bsuid.count(".") > 1`. Matching on `"ENT"` would bet that `ENT` is the
+only marker Meta will ever insert — an inference either way, so the weaker one wins. It
+earns its place because this release hands callers `user_id` and `parent_user_id` side by
+side on `Contact`, `Message::Base`, `Status`, `Message::System`, `UserIdUpdate::Entry`,
+`UserPreferences::Entry`, and `SmbAppStateSync::Contact`, which makes the mix-up the
+predictable mistake. Portfolio membership, by contrast, is account state the gem cannot see
+and is left to Meta — there is a spec pinning that deliberate gap.
+
 ## Conventions
 
 Same as `../subscribed_app/CLAUDE.md` unless noted:
 
 1. `Response.deserialize(data)`: `data ||= {}` first, tolerant of a nil or partial
-   payload, exactly like every other `Response#deserialize` in this gem.
+   payload, exactly like every other `Response#deserialize` in this gem — including
+   `Username::Details`, `Username::Suggestions`, and `ContactBook::Deletion`.
 2. `success` is computed as `response["success"] == true` — a strict boolean, the same
    convention as `SubscribedApp::Response::Unsubscription`, `MessageTemplates#success?`
    and `Media#delete`.
@@ -190,8 +297,11 @@ Same as `../subscribed_app/CLAUDE.md` unless noted:
    `RequestCode::CodeMethods` (`SMS`/`VOICE`) both follow
    `MessageTemplates::Template::SubCategories`'s precedent, not
    `MessageTemplates::Categories`'s (which is shared by three classes). Each `.normalize`
-   accepts either casing and emits uppercase, per the enum convention in
-   `../message_templates/CLAUDE.md`. `Profile::Verticals` is the one enum here with its own
+   accepts either casing and emits **Meta's documented casing** for that field, per the enum
+   convention in `../message_templates/CLAUDE.md` — uppercase for every enum here except
+   `Username::Claim::TransferActions`, which Meta documents as lowercase
+   (`none`/`force_transfer`). The rule was always "emit what Meta expects"; until that enum
+   arrived, that happened to be uppercase everywhere. `Profile::Verticals` is the one enum here with its own
    file, because it has two consumers — see "Why `Account` and `Profile` live here" above.
 6. **Validate only what Meta documents, nothing speculative.** `Register`'s `pin` gets a
    `/\A\d{6}\z/` format check because Meta documents it as 6-digit; `VerifyCode`'s
@@ -221,6 +331,11 @@ Same as `../subscribed_app/CLAUDE.md` unless noted:
 | `Account::Update.call(name:, timezone_id:)` | `POST /{waba_id}` | `Response` |
 | `Profile::Get.call(fields:)` | `GET /{phone_id}/whatsapp_business_profile` | `Profile::Details` |
 | `Profile::Update.call(**fields)` | `POST /{phone_id}/whatsapp_business_profile` | `Response` |
+| `Username::Get.call` | `GET /{phone_id}/username` | `Username::Details` |
+| `Username::Claim.call(username:, transfer_action:)` | `POST /{phone_id}/username` | `Username::Details` |
+| `Username::Delete.call` | `DELETE /{phone_id}/username` | `Response` |
+| `Username::Suggest.call` | `GET /{phone_id}/username_suggestions` | `Username::Suggestions` |
+| `ContactBook::Delete.call(bsuid:)` | `DELETE /{phone_id}/contact_book` | `ContactBook::Deletion` |
 
 The four onboarding actions and the two `Profile` actions require `phone_id` (set via
 `Whatsapp.configure` or `Client.new(phone_id:)`) and the `whatsapp_business_messaging` +
@@ -275,6 +390,12 @@ Whatsapp::BusinessPhoneNumber::Deregister.call.success
 
 Whatsapp::BusinessPhoneNumber::Profile::Update.new(vertical: "retail", websites: []).serialize
 # => { messaging_product: "whatsapp", vertical: "RETAIL", websites: [] }
+
+Whatsapp::BusinessPhoneNumber::Username::Claim.new(username: "JaspersMarket").serialize
+# => { username: "jaspersmarket", transfer_action: "none" }
+
+Whatsapp::BusinessPhoneNumber::ContactBook::Delete.new(bsuid: "US.13491208655302741918").serialize
+# => { messaging_product: "whatsapp", bsuid: "US.13491208655302741918" }
 ```
 
 ### Unverified against a live WABA
@@ -300,6 +421,18 @@ genuinely load-bearing uncertainty in the feature:
 - whether `POST` ever echoes anything beyond `{success}`. The reference says it does not, so
   `Response#id` stays `VerifyCode`-only.
 
+`Username` and `ContactBook` are likewise built from Meta's published schema, not a live
+account. Four things to confirm:
+
+- whether `POST /{phone_id}/username` really answers `{status}` only, rather than echoing
+  the username back. `Details#username` tolerates either.
+- whether the `username_suggestions` `data` array can ever hold more than one entry.
+  `Suggestions` `flat_map`s across all of them, so either answer works.
+- whether Meta accepts a mixed-case username (this gem downcases and sends it) or rejects
+  it outright, and whether `wwwidgets` is genuinely refused by the bare-`www` rule.
+- whether `DELETE /{phone_id}/contact_book` rejects a parent BSUID with a distinguishable
+  error code. The local guard means it should never reach the API from this gem.
+
 ## Not implemented
 
 - **Client-side rate-limit tracking.** `register`/`deregister` document a hard cap (10
@@ -315,6 +448,14 @@ genuinely load-bearing uncertainty in the feature:
   a media ID, which is a different thing and will not work here. Same standing exclusion as
   media handles in `../message_templates/CLAUDE.md`.
 - **Profile read caching.** Meta suggests it; invalidation is an application concern.
+- **Contact book reads and writes.** Meta documents only the delete on that edge. A future
+  read belongs in the same `ContactBook` namespace. Disabling the feature entirely is a
+  Meta Business Suite setting with no API, so it is not wrappable at all.
+- **Parent BSUID Accounts API.** `GET api.facebook.com/{business_id}/parent-bsuid-accounts`
+  lists the portfolios enrolled in a shared parent BSUID account. Deliberately absent: it
+  addresses a *business portfolio* ID, which `Configuration` does not hold, and it lives on
+  `api.facebook.com` rather than the configured `graph.facebook.com` host — two new concepts
+  for one read that only enrolled managed businesses can call.
 - **A `bin/dev` smoke test.** Unlike the throwaway template the existing smoke flow
   creates and deletes, exercising this flow against a real number is destructive and
   rate-limited.

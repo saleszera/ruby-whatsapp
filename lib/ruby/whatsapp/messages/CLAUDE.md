@@ -14,8 +14,8 @@ This directory contains every message type supported by the WhatsApp Cloud API. 
 2. **Define a `Defaults::TYPE` constant** — the string value sent as `type` in the API payload (e.g. `"text"`, `"video"`).
 3. **Declare attributes with `attr_accessor`** — annotate each with `# @!attribute` YARD tags.
 4. **Add `ActiveModel` validations** — use `validates` for simple rules; use a private `validate_*` method for complex cross-field rules (e.g. `validate_id_or_link` in `Video`).
-5. **Call `super(**kwargs)` then `validate!` in `initialize`** — `super` passes `:to` up to `Base`; the second `validate!` runs the subclass validations after attributes are set.
-6. **Implement `serialize`** — returns a `Hash` with the full API payload. Common fields (`messaging_product`, `recipient_type`, `to`, `type`) come first; the type-specific payload is a nested key matching `Defaults::TYPE`.
+5. **Call `super(**kwargs)` then `validate!` in `initialize`** — `super` passes `:to`/`:recipient` up to `Base` (every kind uses the anonymous `super(**)` form, so a new `Base` keyword reaches all of them for free); the second `validate!` runs the subclass validations after attributes are set.
+6. **Implement `serialize`** — returns a `Hash` with the full API payload. Common fields (`messaging_product`, `recipient_type`, whichever of `to`/`recipient` was given, `type`) come first; the type-specific payload is a nested key matching `Defaults::TYPE`. `Base#envelope` compacts the recipient pair only — never the whole envelope, which would swallow a `nil` a subclass passes in its own body.
 7. **Extract private payload helpers** — when the type-specific hash has optional fields, move it to a private `*_payload` method and call `.compact` to drop `nil` values.
 8. **Add a doc comment and source URL** — the class comment must describe the message type and include a `# Source:` line pointing to the official Meta developer docs.
 
@@ -29,7 +29,7 @@ Every message class that returns a structured API response has a corresponding `
 
 ```
 Response                         # top-level: messaging_product, contacts, messages
-  Response::Contacts             # input, wa_id
+  Response::Contacts             # input, wa_id (phone-addressed only), user_id (BSUID-addressed only)
   Response::Messages             # id
 ```
 
@@ -226,6 +226,8 @@ ACTION_TYPES = {
   url_button:       { klass: UrlButton,       api_type: "cta_url" },
   media_carousel:   { klass: MediaCarousel,   api_type: "carousel" },
   product_carousel: { klass: ProductCarousel, api_type: "product_list" },
+  request_contact_info: { klass: RequestContactInfo, api_type: "request_contact_info",
+                          parameterless: true },
 }
 ```
 
@@ -289,9 +291,53 @@ Whatsapp::Messages::MarkMessageAsRead.new(message_id: "wamid.HBg...").serialize
 
 The API responds with `{ "success": true }` rather than the usual `{ messaging_product, contacts, messages }` shape — see `Response#success` in the "Response deserialization" section above.
 
+### `request_contact_info`, and the `parameterless` registry flag
+
+`Interactive::RequestContactInfo` is the only action kind with nothing for a caller to
+supply — its whole payload is `{ name: "request_contact_info" }` — and it is the only one
+where the registry key and the wire `api_type` coincide, which is worth a comment at the
+registry since the registry exists precisely because they usually differ.
+
+That required relaxing `validates :action, presence: true`: an empty `action` hash is
+`blank?`, so presence would reject the one kind that legitimately has none. The registry
+entry carries `parameterless: true` and `#validate_action` skips the check for it. Two
+details that are load-bearing:
+
+- It reads `ACTION_TYPES[type]`, **not** the `fetch`-backed `#action_config`. An unknown
+  `type` must fall through to the `inclusion` validator, not raise `KeyError` from inside
+  a validator — there is a spec pinning that.
+- `initialize`'s `action:` gained a `{}` default. A widening, so nothing existing breaks;
+  the other five kinds still fail their own validations on empty input, which is also
+  pinned.
+
+`RequestContactInfo.serialize` takes a keyword splat rather than named parameters,
+because `#interactive_payload` calls it as `serialize(**action)` with an empty hash.
+`ReplyButtons`' explicit `serialize(buttons:)` form would have raised.
+
+## Deliberately not validated
+
+Three recipient-related omissions, recorded so they read as decisions rather than gaps:
+
+- **BSUID format.** `Base#recipient` gets presence only, no regex. Meta describes the
+  shape (country code, period, up to 128 alphanumerics, `ENT.` infix for a parent BSUID)
+  but publishes no client-side rule for it — the same footing as `Profile::Update#email`,
+  which is left to the server, and unlike `Register`'s PIN, which Meta specifies exactly.
+  The decisive argument is asymmetry: the canonical source of a `recipient` is this gem's
+  own `Webhook::Contact#user_id`, which keeps it a raw string, so a regex here would
+  refuse to reply to a customer Meta had just described. `MarkMessageAsRead#message_id`
+  is the existing precedent for an opaque Meta-minted identifier passed through unchecked.
+- **Error `131062`** — BSUID recipients are refused for one-tap/zero-tap/copy-code
+  authentication templates. Not checkable locally: a template is addressed by `name` and
+  `language`, so `Messages::Template` never learns its category, and inferring it from
+  `components` would misfire — `copy_code` is a sub-type of both copy-code auth templates
+  and limited-time-offer marketing templates, and only the former is restricted.
+- **`Response::Contacts#parent_user_id`** — deliberately absent. Meta returns a parent
+  BSUID in the single `user_id` field on the send response, unlike the webhook classes,
+  which separate the two. Adding a second field here would be inventing one.
+
 ## Adding a new message type (checklist)
 
-This checklist assumes the common case: a message sent *to a recipient*, sharing the `to`/`recipient_type`/`type` envelope. If the new type has no recipient or doesn't share that envelope (like `MarkMessageAsRead`), skip inheriting `Base` and registering it in `KINDS`, and instead give it its own hand-written class method in `messages.rb` — see the `Mark Message As Read` entry above for the precedent.
+This checklist assumes the common case: a message sent *to a recipient*, sharing the `to`/`recipient`/`recipient_type`/`type` envelope. If the new type has no recipient or doesn't share that envelope (like `MarkMessageAsRead`), skip inheriting `Base` and registering it in `KINDS`, and instead give it its own hand-written class method in `messages.rb` — see the `Mark Message As Read` entry above for the precedent.
 
 - [ ] Write a failing spec under `spec/ruby/whatsapp/messages/<type>_spec.rb`
 - [ ] Create `lib/ruby/whatsapp/messages/<type>.rb` inheriting `Base`

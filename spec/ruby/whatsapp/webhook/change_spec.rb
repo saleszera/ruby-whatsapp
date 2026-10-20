@@ -21,14 +21,30 @@ RSpec.describe Whatsapp::Webhook::Change do
       expect(change.value).to be_a(Whatsapp::Webhook::Messages)
     end
 
-    it "dispatches every one of the 19 documented fields to its own class" do
+    it "dispatches the user_id_update field to Whatsapp::Webhook::UserIdUpdate" do
+      change = described_class.deserialize(
+        "field" => "user_id_update", "value" => { "messaging_product" => "whatsapp" }
+      )
+
+      expect(change.value).to be_a(Whatsapp::Webhook::UserIdUpdate)
+    end
+
+    it "dispatches the business_username_updates field to Whatsapp::Webhook::BusinessUsernameUpdates" do
+      change = described_class.deserialize(
+        "field" => "business_username_updates", "value" => { "status" => "approved" }
+      )
+
+      expect(change.value).to be_a(Whatsapp::Webhook::BusinessUsernameUpdates)
+    end
+
+    it "dispatches every one of the 21 documented fields to its own class" do
       Whatsapp::Webhook::Change::FIELDS.each do |field, klass|
         change = described_class.deserialize("field" => field.to_s, "value" => {})
 
         expect(change.value).to be_a(klass)
       end
 
-      expect(Whatsapp::Webhook::Change::FIELDS.size).to eq(19)
+      expect(Whatsapp::Webhook::Change::FIELDS.size).to eq(21)
     end
   end
 end

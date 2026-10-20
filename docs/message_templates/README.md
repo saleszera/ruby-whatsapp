@@ -191,7 +191,7 @@ templates.delete(hsm_ids: [], name: "x")
   [`Media#upload`](../media/README.md), whose media IDs are for *sending*, not
   template creation.
 - **Undocumented button types:** `FLOW`, `MPM`, `CATALOG`, `VOICE_CALL`, `VIDEO_CALL`,
-  `POSTBACK`, `BOOKING_STATUS`, `PAYMENT_REQUEST`, `REQUEST_CONTACT_INFO`. Named in
+  `POSTBACK`, `BOOKING_STATUS`, `PAYMENT_REQUEST`. Named in
   Meta's Graph enum with no published field reference.
   [`LibraryTemplate`](library.md) does accept most of them, because Meta documents them
   by name in *that* context.

@@ -6,7 +6,7 @@ module Whatsapp
       # A single contact-sync entry within an `smb_app_state_sync` notification.
       class StateSync
         # @!attribute [rw] type
-        #   @return [String, nil]
+        #   @return [String, nil] `"contact"` is the only kind Meta documents.
         attr_accessor :type
 
         # @!attribute [rw] action
@@ -14,13 +14,22 @@ module Whatsapp
         attr_accessor :action
 
         # @!attribute [rw] contact
-        #   @return [Hash] Left untyped — Meta's docs don't publish this entry's schema.
+        #   @return [Contact, nil] The synced address-book entry.
         attr_accessor :contact
 
-        def initialize(type:, action:, contact:)
+        # @!attribute [rw] timestamp
+        #   @return [String, nil] Flattened up from this entry's own `metadata.timestamp`.
+        #     That nested object is *not* {Whatsapp::Webhook::Metadata} — it carries only a
+        #     timestamp, so the wrapper is dropped rather than typed, the same habit as
+        #     {Contact#profile_name}. Should Meta add a sibling key there, this becomes a
+        #     class instead.
+        attr_accessor :timestamp
+
+        def initialize(type:, action:, contact: nil, timestamp: nil)
           @type = type
           @action = action
           @contact = contact
+          @timestamp = timestamp
         end
 
         class << self
@@ -29,7 +38,12 @@ module Whatsapp
           def deserialize(data)
             data ||= {}
 
-            new(type: data["type"], action: data["action"], contact: data["contact"] || {})
+            new(
+              type: data["type"],
+              action: data["action"],
+              contact: data["contact"] ? Contact.deserialize(data["contact"]) : nil,
+              timestamp: data.dig("metadata", "timestamp")
+            )
           end
         end
       end

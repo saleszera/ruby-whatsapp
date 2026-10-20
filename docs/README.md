@@ -49,7 +49,7 @@ Full reference for [ruby-whatsapp](https://github.com/saleszera/ruby-whatsapp). 
 
 | Page | Covers |
 | --- | --- |
-| [webhooks/](webhooks/README.md) | Install, verification, signature, dispatch, all 19 notification fields |
+| [webhooks/](webhooks/README.md) | Install, verification, signature, dispatch, all 21 notification fields |
 | [webhooks/messages.md](webhooks/messages.md) | Inbound messages and delivery statuses — the one you'll actually use |
 
 ## Account administration
@@ -60,6 +60,8 @@ Full reference for [ruby-whatsapp](https://github.com/saleszera/ruby-whatsapp). 
 | [business_phone_number/](business_phone_number/README.md) | Onboarding a phone number: request code → verify → register |
 | [business_phone_number/account.md](business_phone_number/account.md) | Reading and updating the business account itself |
 | [business_phone_number/profile.md](business_phone_number/profile.md) | Reading and updating the business profile a user sees |
+| [business_phone_number/username.md](business_phone_number/username.md) | Claiming and managing the searchable business username |
+| [business_phone_number/contact_book.md](business_phone_number/contact_book.md) | Removing a stored user contact from Meta's contact book |
 
 ## Reading order
 

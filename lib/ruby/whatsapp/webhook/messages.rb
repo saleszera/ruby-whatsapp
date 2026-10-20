@@ -2,9 +2,10 @@
 
 module Whatsapp
   module Webhook
-    # The `messages` webhook field's `value` payload — the only field with a
-    # confirmed, JSON-example-backed schema in Meta's docs. Carries inbound
-    # messages and/or delivery status updates for one of your business phone numbers.
+    # The `messages` webhook field's `value` payload — one of five fields with a
+    # confirmed, JSON-example-backed schema in Meta's docs, alongside {UserIdUpdate}
+    # and {BusinessUsernameUpdates}. Carries inbound messages and/or delivery status
+    # updates for one of your business phone numbers.
     # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/overview
     class Messages
       # @!attribute [rw] messaging_product

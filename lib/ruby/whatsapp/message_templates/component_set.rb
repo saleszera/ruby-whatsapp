@@ -50,6 +50,12 @@ module Whatsapp
       # Categories that may use a location header.
       LOCATION_HEADER_CATEGORIES = [Categories::UTILITY, Categories::MARKETING].freeze
 
+      # Categories that may carry a request-contact-info button. Deliberately a separate
+      # constant from LOCATION_HEADER_CATEGORIES despite holding the same two values
+      # today: they are unrelated Meta rules that merely coincide, and merging them would
+      # couple two things that can move independently.
+      REQUEST_CONTACT_INFO_CATEGORIES = [Categories::UTILITY, Categories::MARKETING].freeze
+
       # @!attribute [rw] components
       #   @return [Array<Component::Base>]
       attr_accessor :components
@@ -67,6 +73,7 @@ module Whatsapp
       validate :validate_singletons
       validate :validate_category_restrictions
       validate :validate_location_header
+      validate :validate_request_contact_info_category
       validate :validate_limited_time_offer
 
       # @param components [Array<Hash, Component::Base>] The template's components.
@@ -149,6 +156,27 @@ module Whatsapp
 
         errors.add(:components,
           "a LOCATION header is only supported on #{LOCATION_HEADER_CATEGORIES.join('/')} templates, not #{category}")
+      end
+
+      # Unlike CATEGORY_RESTRICTED_TYPES, which keys on *component* types, this rule is
+      # carried by a button nested inside a BUTTONS component — so it drills in the way
+      # #validate_location_header drills into a header, using the `api_types` that
+      # {Component::Buttons} already exposes.
+      #
+      # Only the top-level BUTTONS component is scanned, not carousel-card buttons: a
+      # CAROUSEL already forces MARKETING via CATEGORY_RESTRICTED_TYPES, which is an
+      # allowed category here, so a card-level scan could never fire.
+      # @return [void]
+      def validate_request_contact_info_category
+        return if category.nil?
+
+        buttons = find(Component::Buttons::Defaults::TYPE)
+        return unless buttons&.api_types&.include?(Button::RequestContactInfo::Defaults::TYPE)
+        return if REQUEST_CONTACT_INFO_CATEGORIES.include?(category)
+
+        errors.add(:components,
+          "a #{Button::RequestContactInfo::Defaults::TYPE} button is only supported on " \
+            "#{REQUEST_CONTACT_INFO_CATEGORIES.join('/')} templates, not #{category}")
       end
 
       # A limited-time offer reshapes the rest of the template: no footer, a shorter

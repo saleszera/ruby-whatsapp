@@ -34,7 +34,16 @@ module Whatsapp
           #   @return [String, nil] Date in YYYY-MM-DD format.
           attr_accessor :birthday
 
-          def initialize(name:, phones:, emails:, addresses:, urls:, org: nil, birthday: nil)
+          # @!attribute [rw] vcard
+          #   @return [String, nil] The card's raw vCard, set only when `origin` is `"other"`.
+          attr_accessor :vcard
+
+          # @!attribute [rw] origin
+          #   @return [String, nil] `"contact_request"` (a `REQUEST_CONTACT_INFO` button tap)
+          #     or `"other"` (shared directly from the chat).
+          attr_accessor :origin
+
+          def initialize(name:, phones:, emails:, addresses:, urls:, org: nil, birthday: nil, vcard: nil, origin: nil)
             @name = name
             @phones = phones
             @emails = emails
@@ -42,6 +51,8 @@ module Whatsapp
             @org = org
             @urls = urls
             @birthday = birthday
+            @vcard = vcard
+            @origin = origin
           end
 
           class << self
@@ -57,7 +68,9 @@ module Whatsapp
                 addresses: Array(data["addresses"]).map { |address_data| Address.deserialize(address_data) },
                 org: data["org"] ? Org.deserialize(data["org"]) : nil,
                 urls: Array(data["urls"]).map { |url_data| Url.deserialize(url_data) },
-                birthday: data["birthday"]
+                birthday: data["birthday"],
+                vcard: data["vcard"],
+                origin: data["origin"]
               )
             end
           end

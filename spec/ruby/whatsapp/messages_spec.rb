@@ -102,6 +102,46 @@ RSpec.describe Whatsapp::Messages do
         .to raise_error(ActiveModel::ValidationError, /Body can't be blank/)
     end
 
+    # Business-scoped user IDs: `recipient` addresses a BSUID rather than a phone number.
+    # See https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids
+    it "addresses a BSUID through recipient, sending no to field at all" do
+      bsuid = "US.13491208655302741918"
+      stub = stub_request(:post, endpoint)
+        .with { |request| JSON.parse(request.body).then { |b| b["recipient"] == bsuid && !b.key?("to") } }
+        .to_return(
+          status: 200,
+          body: {
+            messaging_product: "whatsapp",
+            contacts: [{ input: bsuid, user_id: bsuid }],
+            messages: [{ id: "wamid.123" }],
+          }.to_json,
+          headers: { "Content-Type" => "application/json" }
+        )
+
+      response = described_class.send_text!(recipient: bsuid, body: "hi")
+
+      expect(stub).to have_been_requested
+      expect(response.contacts.first.user_id).to eq(bsuid)
+      expect(response.contacts.first.wa_id).to be_nil
+    end
+
+    it "sends both identifiers when both are given, letting Meta prefer the phone number" do
+      stub = stub_request(:post, endpoint)
+        .with { |request| JSON.parse(request.body).values_at("to", "recipient").none?(&:nil?) }
+        .to_return(status: 200, body: success_body, headers: { "Content-Type" => "application/json" })
+
+      described_class.send_text!(to: "+1555", recipient: "US.13491208655302741918", body: "hi")
+
+      expect(stub).to have_been_requested
+    end
+
+    it "raises before any request when neither identifier is given" do
+      expect { described_class.send_text!(body: "hi") }
+        .to raise_error(ActiveModel::ValidationError, /at least one of to or recipient/)
+
+      expect(a_request(:post, endpoint)).not_to have_been_made
+    end
+
     describe "kind-to-class dispatch" do
       it "builds the message class matching each kind registered in KINDS" do
         # Minimal valid payload for each registered kind, paired with the

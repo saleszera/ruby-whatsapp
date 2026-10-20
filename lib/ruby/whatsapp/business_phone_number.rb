@@ -17,6 +17,15 @@ module Whatsapp
   # {Profile} reads and updates the public card a WhatsApp user sees before they reply.
   # It addresses `phone_id` like the onboarding actions above, so it shares their transport.
   #
+  # {Username} reads, claims, and deletes the searchable `@name` a WhatsApp user can find
+  # the number by — the business half of Meta's usernames rollout, whose user half is what
+  # makes {Whatsapp::Messages::Base#recipient} necessary. Two `phone_id` edges, one
+  # transport, still no exception.
+  #
+  # {ContactBook} deletes a stored user contact — the store Meta uses to keep putting a
+  # user's phone number in your webhooks after they adopt a username. Also a `phone_id`
+  # edge, though what it affects is scoped to the whole business portfolio.
+  #
   # {Account} is the one exception to the `phone_id` rule: it reads and updates the
   # WhatsApp Business Account a number belongs to, so it addresses `waba_id` and
   # carries its own transport.

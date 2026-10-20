@@ -12,7 +12,7 @@ Whatsapp::Messages.send_text!(to: "+15551234567", body: "Hello from ruby-whatsap
 
 | Field | Required | Rules |
 | --- | --- | --- |
-| `to` | yes | The recipient's phone number |
+| `to` / `recipient` | at least one | Phone number and/or [BSUID](README.md#addressing-to-recipient-or-both) |
 | `body` | yes | Max **4096** characters |
 | `preview_url` | no | `true` or `false`. **Defaults to `true`** |
 

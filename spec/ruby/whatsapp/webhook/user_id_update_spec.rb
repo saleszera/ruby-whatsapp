@@ -1,0 +1,60 @@
+# frozen_string_literal: true
+
+RSpec.describe Whatsapp::Webhook::UserIdUpdate do
+  describe ".deserialize" do
+    it "maps messaging_product, metadata, contacts, and the user_id_update entries" do
+      value = described_class.deserialize(
+        "messaging_product" => "whatsapp",
+        "metadata" => { "display_phone_number" => "15550783881", "phone_number_id" => "106540352242922" },
+        "contacts" => [{ "profile" => { "name" => "Jane Doe" }, "wa_id" => "16505551234" }],
+        "user_id_update" => [
+          {
+            "wa_id" => "16505551234",
+            "detail" => "User id for Jane Doe has been updated.",
+            "user_id" => { "previous" => "US.OLD", "current" => "US.NEW" },
+            "timestamp" => "1750030073",
+          },
+        ]
+      )
+
+      expect(value.messaging_product).to eq("whatsapp")
+      expect(value.metadata).to be_a(Whatsapp::Webhook::Metadata)
+      expect(value.metadata.phone_number_id).to eq("106540352242922")
+      expect(value.contacts.first).to be_a(Whatsapp::Webhook::Contact)
+      expect(value.contacts.first.wa_id).to eq("16505551234")
+      expect(value.updates.first).to be_a(Whatsapp::Webhook::UserIdUpdate::Entry)
+      expect(value.updates.first.user_id.current).to eq("US.NEW")
+    end
+
+    it "tolerates a missing metadata, contacts, and user_id_update" do
+      value = described_class.deserialize("messaging_product" => "whatsapp")
+
+      expect(value.metadata).to be_nil
+      expect(value.contacts).to eq([])
+      expect(value.updates).to eq([])
+    end
+
+    it "keeps the untouched value hash, not a copy" do
+      payload = { "messaging_product" => "whatsapp", "user_id_update" => [{ "wa_id" => "16505551234" }] }
+
+      expect(described_class.deserialize(payload).raw).to equal(payload)
+    end
+
+    it "keeps the raw value hash when the entries arrive under a key it does not read" do
+      value = described_class.deserialize(
+        "messaging_product" => "whatsapp",
+        "user_id_updates" => [{ "wa_id" => "16505551234" }]
+      )
+
+      expect(value.updates).to eq([])
+      expect(value.raw).to eq(
+        "messaging_product" => "whatsapp",
+        "user_id_updates" => [{ "wa_id" => "16505551234" }]
+      )
+    end
+
+    it "leaves raw an empty hash for a nil value" do
+      expect(described_class.deserialize(nil).raw).to eq({})
+    end
+  end
+end

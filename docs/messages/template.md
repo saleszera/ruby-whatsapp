@@ -23,7 +23,7 @@ Whatsapp::Messages.send_template!(
 
 | Field | Required | Rules |
 | --- | --- | --- |
-| `to` | yes | The recipient's phone number |
+| `to` / `recipient` | at least one | Phone number and/or [BSUID](README.md#addressing-to-recipient-or-both) |
 | `name` | yes | The approved template's name |
 | `language` | yes | `{ code: "en_US" }` — validated against the supported list |
 | `components` | no | Array of components supplying placeholder values. Defaults to `[]` |
@@ -35,6 +35,33 @@ typo raises locally instead of coming back as a Meta error:
 Whatsapp::Utils::LanguageCodes.valid?("en_US")  # => true
 Whatsapp::Utils::LanguageCodes.all.size         # => 71
 ```
+
+### Authentication templates cannot go to a BSUID
+
+One-tap, zero-tap, and copy-code
+[authentication templates](../message_templates/authentication.md) require the
+recipient's **phone number**. Address one to a
+[BSUID](README.md#business-scoped-user-ids-bsuid) via `recipient:` and Meta answers
+with error `131062`:
+
+```
+Business-scoped User ID (BSUID) recipients are not supported for this message.
+```
+
+The gem cannot catch this locally, and deliberately does not try. A template is
+addressed at send time by `name` and `language` only — `Messages::Template` never
+learns its own category, and the OTP configuration lives in the WABA. Guessing from
+`components` would be worse than not guessing: a `copy_code` sub-type appears both on
+copy-code authentication templates *and* on limited-time-offer marketing templates,
+which have no such restriction, so any local rule would reject valid sends.
+
+If you need to reach a username-only user with an authentication template, ask for
+their phone number first — see the `REQUEST_CONTACT_INFO` button in
+[components.md](../message_templates/components.md).
+
+> Meta names one-tap, zero-tap, and copy-code specifically. Whether a plain
+> `NO_BUTTONS` authentication template is also refused is **not documented** — treat it
+> as untested rather than assuming either way.
 
 ## Components
 

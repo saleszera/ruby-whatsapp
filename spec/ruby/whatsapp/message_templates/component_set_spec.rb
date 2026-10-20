@@ -83,6 +83,42 @@ RSpec.describe Whatsapp::MessageTemplates::ComponentSet do
     end
   end
 
+  describe "request-contact-info button rules" do
+    let(:contact_buttons) { { type: :buttons, buttons: [{ type: :request_contact_info }] } }
+    let(:quick_reply_buttons) { { type: :buttons, buttons: [{ type: :quick_reply, text: "Stop" }] } }
+
+    it "allows the button on a utility template" do
+      expect { described_class.new(components: [body, contact_buttons], category: categories::UTILITY) }
+        .not_to raise_error
+    end
+
+    it "allows the button on a marketing template" do
+      expect { described_class.new(components: [body, contact_buttons], category: categories::MARKETING) }
+        .not_to raise_error
+    end
+
+    it "rejects the button on an authentication template" do
+      expect { described_class.new(components: [body, contact_buttons], category: categories::AUTHENTICATION) }
+        .to raise_error(
+          ActiveModel::ValidationError,
+          %r{REQUEST_CONTACT_INFO button is only supported on UTILITY/MARKETING}
+        )
+    end
+
+    it "skips the check when no category is supplied, as when editing components" do
+      expect { described_class.new(components: [body, contact_buttons]) }.not_to raise_error
+    end
+
+    it "leaves other button types alone on an authentication template" do
+      expect { described_class.new(components: [body, quick_reply_buttons], category: categories::AUTHENTICATION) }
+        .not_to raise_error
+    end
+
+    it "does not fire when the template has no buttons component at all" do
+      expect { described_class.new(components: [body], category: categories::AUTHENTICATION) }.not_to raise_error
+    end
+  end
+
   describe "carousel rules" do
     let(:carousel) do
       {

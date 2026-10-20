@@ -7,9 +7,9 @@ module Whatsapp
       # type Meta added after this gem was released, or a message the Cloud API
       # itself couldn't process (carries an `errors[]` array in that case).
       class Unknown < Base
-        # @!attribute [rw] raw
+        # @!attribute [r] raw
         #   @return [Hash] The full, untyped raw message hash.
-        attr_accessor :raw
+        attr_reader :raw
 
         # @!attribute [rw] errors
         #   @return [Array<Error>]

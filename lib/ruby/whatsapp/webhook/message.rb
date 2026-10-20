@@ -22,6 +22,9 @@ module Whatsapp
         order: Order,
         system: System,
         reaction: Reaction,
+        # Control types: these name a prior message rather than carrying content of their own.
+        revoke: Revoke,
+        edit: Edit,
       }.freeze
 
       class << self

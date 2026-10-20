@@ -86,8 +86,18 @@ A required Ruby keyword that isn't supplied raises `ArgumentError`, not a valida
 error — it never reaches the validator:
 
 ```ruby
+Whatsapp::Messages.send_text!(to: "+15551234567")
+# => ArgumentError: missing keyword: :body
+```
+
+The recipient is the exception. Since a message can be addressed by phone number
+(`to:`) *or* by [BSUID](messages/README.md#addressing-to-recipient-or-both)
+(`recipient:`), neither keyword is individually required, so omitting both is a
+validation failure rather than an arity one:
+
+```ruby
 Whatsapp::Messages.send_text!(body: "Hi")
-# => ArgumentError: missing keyword: :to
+# => ActiveModel::ValidationError: at least one of to or recipient must be provided
 ```
 
 ## API failures

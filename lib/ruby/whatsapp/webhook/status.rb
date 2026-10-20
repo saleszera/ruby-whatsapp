@@ -18,8 +18,21 @@ module Whatsapp
       attr_accessor :timestamp
 
       # @!attribute [rw] recipient_id
-      #   @return [String, nil]
+      #   @return [String, nil] Omitted when sent to the recipient's BSUID and their
+      #     phone number is unavailable.
       attr_accessor :recipient_id
+
+      # @!attribute [rw] recipient_user_id
+      #   @return [String, nil] The recipient's business-scoped user ID (BSUID). Meta sends
+      #     it on every status, however the message was addressed — a phone number in `to`
+      #     does not suppress it. The single exception is a `"failed"` status for a message
+      #     sent to a phone number, where it is omitted; a `"failed"` status for a
+      #     BSUID-addressed message still carries it.
+      attr_accessor :recipient_user_id
+
+      # @!attribute [rw] recipient_parent_user_id
+      #   @return [String, nil] The recipient's parent BSUID, present only when enrolled.
+      attr_accessor :recipient_parent_user_id
 
       # @!attribute [rw] conversation
       #   @return [Conversation, nil]
@@ -33,11 +46,17 @@ module Whatsapp
       #   @return [Array<Error>]
       attr_accessor :errors
 
-      def initialize(id:, status:, timestamp:, recipient_id:, conversation: nil, pricing: nil, errors: [])
+      def initialize(
+        id:, status:, timestamp:,
+        recipient_id: nil, recipient_user_id: nil, recipient_parent_user_id: nil,
+        conversation: nil, pricing: nil, errors: []
+      )
         @id = id
         @status = status
         @timestamp = timestamp
         @recipient_id = recipient_id
+        @recipient_user_id = recipient_user_id
+        @recipient_parent_user_id = recipient_parent_user_id
         @conversation = conversation
         @pricing = pricing
         @errors = errors
@@ -54,6 +73,8 @@ module Whatsapp
             status: data["status"],
             timestamp: data["timestamp"],
             recipient_id: data["recipient_id"],
+            recipient_user_id: data["recipient_user_id"],
+            recipient_parent_user_id: data["recipient_parent_user_id"],
             conversation: data["conversation"] ? Conversation.deserialize(data["conversation"]) : nil,
             pricing: data["pricing"] ? Pricing.deserialize(data["pricing"]) : nil,
             errors: Array(data["errors"]).map { |error_data| Error.deserialize(error_data) }

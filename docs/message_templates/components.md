@@ -108,6 +108,7 @@ Resolved through the frozen `Button::TYPES` registry.
 | `:phone_number` | `PHONE_NUMBER` | `text` ≤ 25, `phone_number` ≤ **20** |
 | `:copy_code` | `COPY_CODE` | `example` ≤ **20** (a bare String), **no `text`** |
 | `:otp` | `OTP` | `otp_type`, `supported_apps`, `zero_tap_terms_accepted` |
+| `:request_contact_info` | `REQUEST_CONTACT_INFO` | **no fields** — `text` optional and only ever `"Share Contact Info"` |
 
 ```ruby
 { type: :quick_reply,  text: "More like this" }
@@ -115,6 +116,7 @@ Resolved through the frozen `Button::TYPES` registry.
 { type: :phone_number, text: "Call", phone_number: "15550051310" }
 { type: :copy_code,    example: "SPRING25" }
 { type: :otp,          otp_type: "COPY_CODE" }
+{ type: :request_contact_info }
 ```
 
 ### The URL button's single trailing variable
@@ -146,6 +148,39 @@ those labels:
 #    Meta supplies the label
 ```
 
+### The request-contact-info button
+
+Asks the recipient to share their phone number, which they hand over with one tap. It
+takes nothing:
+
+```ruby
+{ type: :buttons, buttons: [{ type: :request_contact_info }] }
+```
+
+This is the counterpart to Meta's usernames rollout: once a user adopts a username their
+phone number may stop reaching you, leaving only their
+[BSUID](../webhooks/messages.md#business-scoped-user-ids-bsuid). It is also the only way
+to reach such a user with a one-tap, zero-tap, or copy-code
+[authentication template](authentication.md), since those require a phone number.
+
+Three things about it:
+
+- **The label is not customizable.** Meta renders it in the recipient's own app language.
+  A `text` field is accepted but must be exactly `"Share Contact Info"`, so the simplest
+  correct thing is to omit it.
+- **`UTILITY` and `MARKETING` only** — a cross-component rule, listed below.
+- **Nothing to fill in when sending.** Unlike a URL or copy-code button, it takes no
+  parameter values, so a template carrying one needs no `button` component in the
+  [send payload](../messages/template.md) at all.
+
+A tap arrives as an inbound [`contacts` message](../webhooks/messages.md#contacts) whose
+`origin` is `"contact_request"`. There is also an
+[interactive-message form](../messages/interactive.md) of the same button, for use inside
+the 24-hour service window.
+
+No per-type cap is enforced: Meta publishes none, and inventing one would reject valid
+payloads — the same reason `OTP` is uncapped. The overall 10-button limit still applies.
+
 ## Cross-component rules
 
 Owned by `ComponentSet`, because it is the only object that can see the siblings:
@@ -155,6 +190,7 @@ Owned by `ComponentSet`, because it is the only object that can see the siblings
   `LIMITED_TIME_OFFER`.
 - `CAROUSEL` or `LIMITED_TIME_OFFER` → category must be `MARKETING`.
 - A `LOCATION` header → category must be `UTILITY` or `MARKETING`.
+- A `REQUEST_CONTACT_INFO` button → category must be `UTILITY` or `MARKETING`.
 - `LIMITED_TIME_OFFER` present → `FOOTER` forbidden, `BODY` ≤ **600**, header
   `IMAGE`/`VIDEO` only, copy-code `example` ≤ **15** and that button must be **first**.
 
@@ -170,7 +206,7 @@ enum but deliberately absent:
 - **Components:** `GREETING`, `ALBUM`, `CALL_PERMISSION_REQUEST`,
   `TAP_TARGET_CONFIGURATION`, `ATTACHMENT`.
 - **Buttons:** `FLOW`, `MPM`, `CATALOG`, `VOICE_CALL`, `VIDEO_CALL`, `POSTBACK`,
-  `BOOKING_STATUS`, `PAYMENT_REQUEST`, `REQUEST_CONTACT_INFO`. Most of these *are*
+  `BOOKING_STATUS`, `PAYMENT_REQUEST`. Most of these *are*
   accepted by [`LibraryTemplate`](library.md), because Meta documents them by name in
   that context.
 
