@@ -23,7 +23,11 @@ module Whatsapp
       attr_accessor :recipient_id
 
       # @!attribute [rw] recipient_user_id
-      #   @return [String, nil] The recipient's business-scoped user ID (BSUID).
+      #   @return [String, nil] The recipient's business-scoped user ID (BSUID). Meta sends
+      #     it on every status, however the message was addressed — a phone number in `to`
+      #     does not suppress it. The single exception is a `"failed"` status for a message
+      #     sent to a phone number, where it is omitted; a `"failed"` status for a
+      #     BSUID-addressed message still carries it.
       attr_accessor :recipient_user_id
 
       # @!attribute [rw] recipient_parent_user_id
@@ -43,7 +47,8 @@ module Whatsapp
       attr_accessor :errors
 
       def initialize(
-        id:, status:, timestamp:, recipient_id:, recipient_user_id:, recipient_parent_user_id:,
+        id:, status:, timestamp:,
+        recipient_id: nil, recipient_user_id: nil, recipient_parent_user_id: nil,
         conversation: nil, pricing: nil, errors: []
       )
         @id = id
