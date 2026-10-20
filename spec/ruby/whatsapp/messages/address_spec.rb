@@ -66,10 +66,18 @@ RSpec.describe Whatsapp::Messages::Address do
       end
     end
 
-    context "without to" do
-      it "raises ArgumentError" do
+    context "without to or recipient" do
+      it "raises ActiveModel::ValidationError" do
         expect { described_class.new(body:, country: described_class::Countries::IN) }
-          .to raise_error(ArgumentError, /missing keyword: :?to/)
+          .to raise_error(ActiveModel::ValidationError, /at least one of to or recipient/)
+      end
+    end
+
+    context "with a BSUID recipient instead of to" do
+      it "is valid" do
+        expect do
+          described_class.new(recipient: "US.13491208655302741918", body:, country: described_class::Countries::IN)
+        end.not_to raise_error
       end
     end
   end

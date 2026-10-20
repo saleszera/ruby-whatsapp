@@ -37,4 +37,46 @@ RSpec.describe Whatsapp::Messages::Response do
       expect(response.success).to be_nil
     end
   end
+
+  describe Whatsapp::Messages::Response::Contacts do
+    describe ".deserialize" do
+      it "maps the BSUID when the message was addressed to one, with no phone number" do
+        contact = described_class.deserialize(
+          "input" => "US.13491208655302741918", "user_id" => "US.13491208655302741918"
+        )
+
+        expect(contact.input).to eq("US.13491208655302741918")
+        expect(contact.user_id).to eq("US.13491208655302741918")
+        expect(contact.wa_id).to be_nil
+      end
+
+      # Meta omits `user_id` whenever the message went to a phone number — including
+      # when both `to` and `recipient` were supplied, since `to` takes precedence. So a
+      # nil `user_id` does not mean the recipient has no BSUID.
+      it "omits the BSUID when the message was addressed to a phone number" do
+        contact = described_class.deserialize("input" => "+16505551234", "wa_id" => "16505551234")
+
+        expect(contact.input).to eq("+16505551234")
+        expect(contact.wa_id).to eq("16505551234")
+        expect(contact.user_id).to be_nil
+      end
+
+      it "maps a parent BSUID, which Meta returns in the same user_id field" do
+        contact = described_class.deserialize(
+          "input" => "US.ENT.11815799212886844830", "user_id" => "US.ENT.11815799212886844830"
+        )
+
+        expect(contact.user_id).to eq("US.ENT.11815799212886844830")
+      end
+
+      it "tolerates both identifiers arriving together" do
+        contact = described_class.deserialize(
+          "input" => "+16505551234", "wa_id" => "16505551234", "user_id" => "US.13491208655302741918"
+        )
+
+        expect(contact.wa_id).to eq("16505551234")
+        expect(contact.user_id).to eq("US.13491208655302741918")
+      end
+    end
+  end
 end
