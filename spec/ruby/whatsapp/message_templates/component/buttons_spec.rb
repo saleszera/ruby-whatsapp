@@ -95,4 +95,15 @@ RSpec.describe Whatsapp::MessageTemplates::Component::Buttons do
       expect(described_class.new(buttons: [url, quick_reply]).api_types).to eq(%w[URL QUICK_REPLY])
     end
   end
+
+  # Meta publishes no per-type cap for this button, so none is invented — the same reason
+  # OTP is uncapped. Pinned so the omission reads as deliberate.
+  describe "request-contact-info buttons" do
+    it "is not capped per type, only by the overall button limit" do
+      component = described_class.new(buttons: Array.new(2) { { type: :request_contact_info } })
+
+      expect(component.serialize[:buttons].size).to eq(2)
+      expect(described_class::MAX_PER_TYPE).not_to have_key("REQUEST_CONTACT_INFO")
+    end
+  end
 end

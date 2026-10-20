@@ -11,8 +11,10 @@ module Whatsapp
     #
     # Only the button types with a published schema are registered. Meta's Graph API
     # enum also lists FLOW, MPM, CATALOG, VOICE_CALL, VIDEO_CALL, POSTBACK,
-    # BOOKING_STATUS, PAYMENT_REQUEST and REQUEST_CONTACT_INFO, but publishes no
-    # field reference for them, so they are deliberately absent rather than guessed.
+    # BOOKING_STATUS and PAYMENT_REQUEST, but publishes no field reference for them, so
+    # they are deliberately absent rather than guessed. REQUEST_CONTACT_INFO used to be on
+    # that list; the business-scoped user ID documentation publishes its schema, so it is
+    # registered.
     # Source: https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates/components/
     class Button
       TYPES = {
@@ -21,6 +23,7 @@ module Whatsapp
         phone_number: PhoneNumber,
         copy_code: CopyCode,
         otp: Otp,
+        request_contact_info: RequestContactInfo,
       }.freeze
 
       class << self

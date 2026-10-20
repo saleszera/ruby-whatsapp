@@ -10,6 +10,7 @@ RSpec.describe Whatsapp::MessageTemplates::Button do
         .to be_a(described_class::PhoneNumber)
       expect(described_class.build(type: :copy_code, example: "250FF")).to be_a(described_class::CopyCode)
       expect(described_class.build(type: :otp, otp_type: "COPY_CODE")).to be_a(described_class::Otp)
+      expect(described_class.build(type: :request_contact_info)).to be_a(described_class::RequestContactInfo)
     end
 
     it "accepts Meta's uppercase wire casing" do
