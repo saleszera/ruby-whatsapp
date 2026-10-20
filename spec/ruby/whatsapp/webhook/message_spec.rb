@@ -21,5 +21,26 @@ RSpec.describe Whatsapp::Webhook::Message do
 
       expect(message).to be_a(Whatsapp::Webhook::Message::Unknown)
     end
+
+    it "dispatches a revoke to Message::Revoke rather than the Unknown fallback" do
+      message = described_class.deserialize(
+        "id" => "wamid.HBg", "timestamp" => "1", "type" => "revoke",
+        "revoke" => { "original_message_id" => "wamid.ORIGINAL" }
+      )
+
+      expect(message).to be_a(Whatsapp::Webhook::Message::Revoke)
+      expect(message.original_message_id).to eq("wamid.ORIGINAL")
+    end
+
+    it "dispatches an edit to Message::Edit rather than the Unknown fallback" do
+      message = described_class.deserialize(
+        "id" => "wamid.HBg", "timestamp" => "1", "type" => "edit",
+        "edit" => { "original_message_id" => "wamid.ORIGINAL",
+                    "message" => { "type" => "text", "text" => { "body" => "fixed" } }, }
+      )
+
+      expect(message).to be_a(Whatsapp::Webhook::Message::Edit)
+      expect(message.message.body).to eq("fixed")
+    end
   end
 end
