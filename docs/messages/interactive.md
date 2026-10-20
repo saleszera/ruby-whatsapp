@@ -14,15 +14,16 @@ Unlike every other kind, `Interactive` is a **single class** that dispatches on
 | `:url_button` | `"cta_url"` | [A link rendered as a button](#cta-url-button) |
 | `:media_carousel` | `"carousel"` | [2–10 swipeable media cards](#media-carousel) |
 | `:product_carousel` | `"product_list"` | [2–10 catalog product cards](#product-carousel) |
+| `:request_contact_info` | `"request_contact_info"` | [A one-tap "share my number" button](#request-contact-info) |
 
 ## Shared fields
 
 | Field | Required | Rules |
 | --- | --- | --- |
-| `to` | yes | The recipient's phone number |
-| `type` | yes | One of the five keys above (Symbol or String) |
+| `to` / `recipient` | at least one | Phone number and/or [BSUID](README.md#addressing-to-recipient-or-both) |
+| `type` | yes | One of the six keys above (Symbol or String) |
 | `body` | yes | Body text, max **1024** characters |
-| `action` | yes | Shape depends on `type` — see each section |
+| `action` | usually | Shape depends on `type` — see each section. Omit it only for `:request_contact_info`, the one kind with nothing to supply |
 | `header` | no | `{ type: "text"\|"image"\|"video"\|"document", ... }` |
 | `footer` | no | `{ text: "..." }`, max **60** characters |
 
@@ -252,6 +253,66 @@ server-side.
 > caveat as the media carousel.
 
 ---
+
+## Request contact info
+
+Asks the recipient to share their phone number, which they hand over with one tap. The
+one action kind that takes no `action:` — there is nothing to configure:
+
+```ruby
+Whatsapp::Messages.send_interactive!(
+  recipient: "US.13491208655302741918",
+  type: :request_contact_info,
+  body: "Mind sharing your number so we can text you the confirmation?"
+)
+```
+
+```json
+{
+  "messaging_product": "whatsapp",
+  "recipient_type": "individual",
+  "recipient": "US.13491208655302741918",
+  "type": "interactive",
+  "interactive": {
+    "type": "request_contact_info",
+    "body": { "text": "Mind sharing your number so we can text you the confirmation?" },
+    "action": { "name": "request_contact_info" }
+  }
+}
+```
+
+Note `interactive.type` and `action.name` are the same literal — this is the only kind
+where the registry key and the wire value coincide.
+
+Use this inside the 24-hour service window; to *open* a conversation with the same ask,
+use the [`REQUEST_CONTACT_INFO` template button](../message_templates/components.md#the-request-contact-info-button)
+instead.
+
+Why you would: once a WhatsApp user adopts a username, their phone number can stop
+appearing in your webhooks, leaving only their
+[BSUID](README.md#business-scoped-user-ids-bsuid) — which is enough to keep messaging
+them, but not enough for a one-tap, zero-tap, or copy-code
+[authentication template](../message_templates/authentication.md). This is how you ask
+for the number back.
+
+A tap arrives as an inbound [`contacts` message](../webhooks/messages.md#contacts) whose
+`origin` is `"contact_request"`:
+
+```ruby
+when "messages"
+  change.value.messages.each do |message|
+    next unless message.type == "contacts"
+
+    shared = message.contacts.first
+    next unless shared.origin == "contact_request"
+
+    Customer.find_by(bsuid: message.from_user_id)
+      &.update!(wa_id: shared.phones.first&.wa_id)
+  end
+```
+
+Meta's published example shows no `header` or `footer`; both are accepted here and
+omitted from the payload when absent, as with every other kind.
 
 ## Validation errors
 

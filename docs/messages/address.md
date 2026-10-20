@@ -20,7 +20,7 @@ Whatsapp::Messages.send_address!(
 
 | Field | Required | Rules |
 | --- | --- | --- |
-| `to` | yes | The recipient's phone number |
+| `to` / `recipient` | at least one | Phone number and/or [BSUID](README.md#addressing-to-recipient-or-both) |
 | `body` | yes | The prompt shown above the form |
 | `country` | yes | `"IN"` or `"SG"` only |
 | `footer` | no | Small print under the form |

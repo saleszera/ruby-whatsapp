@@ -15,7 +15,7 @@ Whatsapp::Messages.send_document!(
 
 | Field | Required | Rules |
 | --- | --- | --- |
-| `to` | yes | The recipient's phone number |
+| `to` / `recipient` | at least one | Phone number and/or [BSUID](README.md#addressing-to-recipient-or-both) |
 | `id` | one of | A media ID from [`Media#upload`](../media/README.md) |
 | `link` | one of | A publicly reachable HTTPS URL |
 | `caption` | no | Max **1024** characters |

@@ -11,7 +11,7 @@ Whatsapp::Messages.send_reaction!(to: "+15551234567", message_id: "wamid.HBg..."
 
 | Field | Required | Rules |
 | --- | --- | --- |
-| `to` | yes | The recipient's phone number |
+| `to` / `recipient` | at least one | Phone number and/or [BSUID](README.md#addressing-to-recipient-or-both) |
 | `message_id` | yes | The WAMID of the message being reacted to |
 | `emoji` | yes | A single emoji, or `""` to remove |
 

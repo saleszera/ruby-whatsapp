@@ -15,7 +15,7 @@ Whatsapp::Messages.send_location_request!(
 
 | Field | Required | Rules |
 | --- | --- | --- |
-| `to` | yes | The recipient's phone number |
+| `to` / `recipient` | at least one | Phone number and/or [BSUID](README.md#addressing-to-recipient-or-both) |
 | `body` | yes | The prompt text, max **1024** characters |
 
 ## Serialized payload
