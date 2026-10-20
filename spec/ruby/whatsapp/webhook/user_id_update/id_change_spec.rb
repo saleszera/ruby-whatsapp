@@ -9,11 +9,8 @@ RSpec.describe Whatsapp::Webhook::UserIdUpdate::IdChange do
       expect(id_change.current).to eq("US.NEW")
     end
 
-    it "tolerates a nil hash" do
-      id_change = described_class.deserialize(nil)
-
-      expect(id_change.previous).to be_nil
-      expect(id_change.current).to be_nil
+    it "returns nil when the key is absent, rather than an all-nil instance" do
+      expect(described_class.deserialize(nil)).to be_nil
     end
   end
 end

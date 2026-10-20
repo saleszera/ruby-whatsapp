@@ -33,5 +33,28 @@ RSpec.describe Whatsapp::Webhook::UserIdUpdate do
       expect(value.contacts).to eq([])
       expect(value.updates).to eq([])
     end
+
+    it "keeps the untouched value hash, not a copy" do
+      payload = { "messaging_product" => "whatsapp", "user_id_update" => [{ "wa_id" => "16505551234" }] }
+
+      expect(described_class.deserialize(payload).raw).to equal(payload)
+    end
+
+    it "keeps the raw value hash when the entries arrive under a key it does not read" do
+      value = described_class.deserialize(
+        "messaging_product" => "whatsapp",
+        "user_id_updates" => [{ "wa_id" => "16505551234" }]
+      )
+
+      expect(value.updates).to eq([])
+      expect(value.raw).to eq(
+        "messaging_product" => "whatsapp",
+        "user_id_updates" => [{ "wa_id" => "16505551234" }]
+      )
+    end
+
+    it "leaves raw an empty hash for a nil value" do
+      expect(described_class.deserialize(nil).raw).to eq({})
+    end
   end
 end

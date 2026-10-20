@@ -21,9 +21,10 @@ module Whatsapp
 
         class << self
           # @param data [Hash, nil] The raw `user_id` or `parent_user_id` hash.
-          # @return [IdChange]
+          # @return [IdChange, nil] `nil` when the key is absent — an id change that did
+          #   not happen is not a change from nothing to nothing.
           def deserialize(data)
-            data ||= {}
+            return if data.nil?
 
             new(previous: data["previous"], current: data["current"])
           end

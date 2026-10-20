@@ -27,7 +27,7 @@ module Whatsapp
         #   @return [String, nil]
         attr_accessor :timestamp
 
-        def initialize(wa_id:, detail:, user_id:, parent_user_id:, timestamp:)
+        def initialize(timestamp:, wa_id: nil, detail: nil, user_id: nil, parent_user_id: nil)
           @wa_id = wa_id
           @detail = detail
           @user_id = user_id
@@ -44,8 +44,8 @@ module Whatsapp
             new(
               wa_id: data["wa_id"],
               detail: data["detail"],
-              user_id: data["user_id"] ? IdChange.deserialize(data["user_id"]) : nil,
-              parent_user_id: data["parent_user_id"] ? IdChange.deserialize(data["parent_user_id"]) : nil,
+              user_id: IdChange.deserialize(data["user_id"]),
+              parent_user_id: IdChange.deserialize(data["parent_user_id"]),
               timestamp: data["timestamp"]
             )
           end

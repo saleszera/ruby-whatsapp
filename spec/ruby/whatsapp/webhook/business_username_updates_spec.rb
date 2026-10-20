@@ -20,5 +20,23 @@ RSpec.describe Whatsapp::Webhook::BusinessUsernameUpdates do
       expect(value.username).to be_nil
       expect(value.status).to eq("deleted")
     end
+
+    it "keeps the raw value hash when none of the keys are the ones it reads" do
+      value = described_class.deserialize("phone_number" => "15550783881", "state" => "approved")
+
+      expect(value.display_phone_number).to be_nil
+      expect(value.status).to be_nil
+      expect(value.raw).to eq("phone_number" => "15550783881", "state" => "approved")
+    end
+  end
+
+  describe "#initialize" do
+    it "builds a deletion, which carries no username" do
+      value = described_class.new(display_phone_number: "15550783881", status: "deleted")
+
+      expect(value.display_phone_number).to eq("15550783881")
+      expect(value.status).to eq("deleted")
+      expect(value.username).to be_nil
+    end
   end
 end

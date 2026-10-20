@@ -30,5 +30,24 @@ RSpec.describe Whatsapp::Webhook::UserIdUpdate::Entry do
 
       expect(entry.parent_user_id).to be_nil
     end
+
+    it "leaves both id changes nil when the entry omits them" do
+      entry = described_class.deserialize("wa_id" => "16505551234", "timestamp" => "1750030073")
+
+      expect(entry.user_id).to be_nil
+      expect(entry.parent_user_id).to be_nil
+    end
+  end
+
+  describe "#initialize" do
+    it "builds an entry carrying only a timestamp" do
+      entry = described_class.new(timestamp: "1750030073")
+
+      expect(entry.timestamp).to eq("1750030073")
+      expect(entry.wa_id).to be_nil
+      expect(entry.detail).to be_nil
+      expect(entry.user_id).to be_nil
+      expect(entry.parent_user_id).to be_nil
+    end
   end
 end
