@@ -45,10 +45,20 @@ Every field is required:
 | `description` | String | The schedule's description |
 | `delivery_time` | Integer | When to send, as a Unix timestamp |
 
+The examples below share this hash:
+
+```ruby
+attrs = {
+  hsm_id: "1234567890", audience_id: "2345678901", waba_cs_id: "3456789012",
+  name: "Black Friday", description: "Black Friday promo to VIP customers",
+  delivery_time: 1_764_000_000,
+}
+```
+
 `delivery_time` must be an integer. For a `Time`, pass `time.to_i`:
 
 ```ruby
-Whatsapp::Schedule::Create.call(..., delivery_time: Time.utc(2026, 11, 27, 9).to_i)
+Whatsapp::Schedule::Create.call(**attrs, delivery_time: Time.utc(2026, 11, 27, 9).to_i)
 ```
 
 All six are checked before the request, so a missing one costs nothing:
