@@ -2,50 +2,89 @@
 
 module Whatsapp
   module Webhook
-    # Chat history synchronization for onboarded business customers.
+    # Chat history synchronization for onboarded business customers — one of the fields
+    # with a confirmed, JSON-example-backed schema, alongside {Messages},
+    # {UserIdUpdate}, {BusinessUsernameUpdates}, and {UserPreferences}.
     #
-    # Best-effort schema: Meta's public docs describe this field in one line with
-    # no published JSON example; `threads`' entry shape isn't confidently
-    # typeable from that description alone, so it's kept as a raw array rather
-    # than guessing further. Validate against a real payload before relying on
-    # this in production.
-    # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/overview
+    # History arrives in chunks. Each `history[]` entry is one {Chunk}, carrying its own
+    # sync `metadata` (`phase`/`chunk_order`/`progress`) and the {Thread}s in it — note
+    # that the value-level `metadata` is the ordinary business-phone-number
+    # {Whatsapp::Webhook::Metadata}, a different object entirely.
+    #
+    # Meta sends a second variant of this field for a synced media asset, which carries
+    # `contacts` and `messages` at the value level instead of inside a thread; both are
+    # mapped here, and are empty for a thread-carrying payload.
+    # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids
     class History
-      # @!attribute [rw] phase
-      #   @return [Integer, nil]
-      attr_accessor :phase
+      # @!attribute [rw] messaging_product
+      #   @return [String, nil]
+      attr_accessor :messaging_product
 
-      # @!attribute [rw] chunk_order
-      #   @return [Integer, nil]
-      attr_accessor :chunk_order
+      # @!attribute [rw] metadata
+      #   @return [Metadata, nil] The business phone number this history belongs to — not
+      #     the per-chunk sync metadata, which lives on {Chunk}.
+      attr_accessor :metadata
 
-      # @!attribute [rw] progress
-      #   @return [Integer, nil]
-      attr_accessor :progress
+      # @!attribute [rw] chunks
+      #   @return [Array<Chunk>]
+      attr_accessor :chunks
 
-      # @!attribute [rw] threads
-      #   @return [Array<Hash>]
-      attr_accessor :threads
+      # @!attribute [rw] contacts
+      #   @return [Array<Contact>] Populated only by the media-asset variant.
+      attr_accessor :contacts
 
-      def initialize(phase:, chunk_order:, progress:, threads:)
-        @phase = phase
-        @chunk_order = chunk_order
-        @progress = progress
-        @threads = threads
+      # @!attribute [rw] messages
+      #   @return [Array<Message::Base>] Populated only by the media-asset variant; a
+      #     thread-carrying payload puts its messages on {Thread#messages} instead.
+      attr_accessor :messages
+
+      # @!attribute [r] raw
+      #   @return [Hash] The untouched `value` hash. A diagnostic escape hatch, not part of
+      #     the supported API: this field has two payload variants and the deeper one nests
+      #     three levels, so a key that drifts would leave a typed accessor empty with no
+      #     other trace. Treat it as read-only — it is the object `JSON.parse` returned.
+      attr_reader :raw
+
+      def initialize(messaging_product:, metadata:, chunks:, contacts:, messages:, raw: {})
+        @messaging_product = messaging_product
+        @metadata = metadata
+        @chunks = chunks
+        @contacts = contacts
+        @messages = messages
+        @raw = raw
+      end
+
+      # A delivery normally carries exactly one chunk, so these three read through to it
+      # rather than making every caller reach for `chunks.first`. Check {#chunks} directly
+      # if you need to handle a multi-chunk delivery.
+      # @return [Integer, nil]
+      def phase
+        chunks.first&.phase
+      end
+
+      # @return [Integer, nil]
+      def chunk_order
+        chunks.first&.chunk_order
+      end
+
+      # @return [Integer, nil] Percent complete, 0-100.
+      def progress
+        chunks.first&.progress
       end
 
       class << self
-        # @param data [Hash] The raw `value` hash.
+        # @param data [Hash] The raw `history` field's `value` hash.
         # @return [History]
         def deserialize(data)
           data ||= {}
-          metadata = data["metadata"] || {}
 
           new(
-            phase: metadata["phase"],
-            chunk_order: metadata["chunk_order"],
-            progress: metadata["progress"],
-            threads: Array(data["threads"])
+            messaging_product: data["messaging_product"],
+            metadata: data["metadata"] ? Metadata.deserialize(data["metadata"]) : nil,
+            chunks: Array(data["history"]).map { |chunk_data| Chunk.deserialize(chunk_data) },
+            contacts: Array(data["contacts"]).map { |contact_data| Contact.deserialize(contact_data) },
+            messages: Array(data["messages"]).map { |message_data| Message.deserialize(message_data) },
+            raw: data
           )
         end
       end

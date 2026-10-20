@@ -3,43 +3,64 @@
 module Whatsapp
   module Webhook
     # User marketing message preference changes (e.g. a customer opting out of
-    # marketing messages).
+    # marketing messages) — one of the fields with a confirmed, JSON-example-backed
+    # schema, alongside {Messages}, {UserIdUpdate}, and {BusinessUsernameUpdates}.
     #
-    # Best-effort schema: Meta's public docs describe this field in one line with
-    # no published JSON example. Validate against a real payload (App Dashboard
-    # "send test payload") before relying on these attribute names in production.
-    # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/overview
+    # Structurally identical to {UserIdUpdate}: the value carries the notification's
+    # own identity (`messaging_product`, `metadata`, `contacts`) plus an array of
+    # entries nested under a repeat of the field's own name.
+    # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids
     class UserPreferences
-      # @!attribute [rw] wa_id
+      # @!attribute [rw] messaging_product
       #   @return [String, nil]
-      attr_accessor :wa_id
+      attr_accessor :messaging_product
 
-      # @!attribute [rw] detail
-      #   @return [String, nil]
-      attr_accessor :detail
+      # @!attribute [rw] metadata
+      #   @return [Metadata, nil]
+      attr_accessor :metadata
 
-      # @!attribute [rw] value
-      #   @return [String, nil] e.g. `"stop"`, `"resume"`.
-      attr_accessor :value
+      # @!attribute [rw] contacts
+      #   @return [Array<Contact>] The users whose preferences changed, carrying the same
+      #     BSUID identifiers as every other `contacts[]` entry — which is how a
+      #     username-adopted user is identifiable here at all once their phone number
+      #     stops being shared.
+      attr_accessor :contacts
 
-      # @!attribute [rw] timestamp
-      #   @return [String, nil]
-      attr_accessor :timestamp
+      # @!attribute [rw] preferences
+      #   @return [Array<Entry>]
+      attr_accessor :preferences
 
-      def initialize(wa_id:, detail:, value:, timestamp:)
-        @wa_id = wa_id
-        @detail = detail
-        @value = value
-        @timestamp = timestamp
+      # @!attribute [r] raw
+      #   @return [Hash] The untouched `value` hash. A diagnostic escape hatch, not part
+      #     of the supported API: {#preferences} reads `value["user_preferences"]` —
+      #     entries nested under a repeat of the field's own name, which is what Meta's
+      #     published example shows — so a key that drifts would otherwise leave
+      #     `preferences` empty with no other trace. Reach for it when a typed accessor is
+      #     unexpectedly `nil`, log what you find, and treat it as read-only: it is the
+      #     object `JSON.parse` returned, not a copy.
+      attr_reader :raw
+
+      def initialize(messaging_product:, metadata:, contacts:, preferences:, raw: {})
+        @messaging_product = messaging_product
+        @metadata = metadata
+        @contacts = contacts
+        @preferences = preferences
+        @raw = raw
       end
 
       class << self
-        # @param data [Hash] The raw `value` hash.
+        # @param data [Hash] The raw `user_preferences` field's `value` hash.
         # @return [UserPreferences]
         def deserialize(data)
           data ||= {}
 
-          new(wa_id: data["wa_id"], detail: data["detail"], value: data["value"], timestamp: data["timestamp"])
+          new(
+            messaging_product: data["messaging_product"],
+            metadata: data["metadata"] ? Metadata.deserialize(data["metadata"]) : nil,
+            contacts: Array(data["contacts"]).map { |contact_data| Contact.deserialize(contact_data) },
+            preferences: Array(data["user_preferences"]).map { |entry_data| Entry.deserialize(entry_data) },
+            raw: data
+          )
         end
       end
     end
