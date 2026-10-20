@@ -146,8 +146,10 @@ because it has a *kind registry* to generate them from; a fixed set of CRUD verb
 not.
 
 **Per-type button caps only where documented.** `Buttons::MAX_PER_TYPE` covers
-`QUICK_REPLY` (10), `URL` (2), `PHONE_NUMBER` (1), `COPY_CODE` (1). `OTP` is uncapped
-because Meta states no limit for it — inventing one would reject valid payloads.
+`QUICK_REPLY` (10), `URL` (2), `PHONE_NUMBER` (1), `COPY_CODE` (1). `OTP` and
+`REQUEST_CONTACT_INFO` are uncapped because Meta states no limit for either — inventing
+one would reject valid payloads. There is a spec pinning the `REQUEST_CONTACT_INFO`
+omission, so it reads as a decision rather than an oversight.
 
 **Carousel cards allow 0–2 buttons.** Meta says "up to 2" and never states a minimum,
 so none is enforced.
@@ -417,8 +419,27 @@ Deliberate — only types with a published Meta field reference get a class:
   Resumable Upload API that produces one needs an `app_id` (absent from
   `Configuration`) and a second auth scheme (`Authorization: OAuth`, not `Bearer`).
 - **Undocumented button types:** `FLOW`, `MPM`, `CATALOG`, `VOICE_CALL`, `VIDEO_CALL`,
-  `POSTBACK`, `BOOKING_STATUS`, `PAYMENT_REQUEST`, `REQUEST_CONTACT_INFO`. Named in
-  Meta's Graph enum with no published field reference. `LibraryTemplate::ButtonInputs`
+  `POSTBACK`, `BOOKING_STATUS`, `PAYMENT_REQUEST`. Named in
+  Meta's Graph enum with no published field reference. `REQUEST_CONTACT_INFO` used to be
+  on this list; the business-scoped user ID documentation publishes its schema, so it is
+  now registered.
+
+  That registration brings one new cross-component rule and two judgment calls worth
+  recording. The rule — `UTILITY`/`MARKETING` only — lives in `ComponentSet`, but *not*
+  in `CATEGORY_RESTRICTED_TYPES`, which keys on component types: this restriction is
+  carried by a button nested inside a `BUTTONS` component, so
+  `validate_request_contact_info_category` drills in the way `validate_location_header`
+  drills into a header. Its `REQUEST_CONTACT_INFO_CATEGORIES` constant is deliberately
+  separate from `LOCATION_HEADER_CATEGORIES` despite holding the same two values today —
+  unrelated Meta rules that merely coincide. Only the top-level `BUTTONS` component is
+  scanned, since a `CAROUSEL` already forces `MARKETING`, which is allowed, so a
+  card-level scan could never fire. And `text` is *forwarded* when given rather than
+  dropped, because Meta documents the field as accepted — it is just constrained to the
+  single literal `"Share Contact Info"`, since the recipient sees an auto-localized label.
+
+  Unverified: whether echoing that `text` changes anything (it may pin the label to
+  English), and whether Meta permits the button inside a carousel card at all — nothing
+  is published either way, so no restriction is invented. `LibraryTemplate::ButtonInputs`
   does accept most of them, because Meta documents them by name in *that* context.
 - **Undocumented component types:** `GREETING`, `ALBUM`, `CALL_PERMISSION_REQUEST`,
   `TAP_TARGET_CONFIGURATION`, `ATTACHMENT`.
