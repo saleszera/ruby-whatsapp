@@ -1,3 +1,20 @@
+## [0.6.1]
+
+### Added
+
+- **`Whatsapp::Schedule`** — `List` and `Create` wrap a WhatsApp Business Account's
+  campaign schedules (`/{waba_id}/schedules`): an approved template sent to an audience
+  at a Unix `delivery_time`. `Create` checks all six documented-required fields before
+  the request, and requires `delivery_time` to be an integer. It checks nothing else,
+  since Meta publishes no length limits and no rule that the time must be in the future.
+  `List` takes `fields`, `limit`, `after`, and `before`, and returns an `Enumerable`
+  `Response::Collection` of `Response::Node`s with `next_cursor`. Its paging reuses
+  `MessageTemplates::Response::Paging` rather than duplicating it. `Node#status` stays
+  the raw string, with `Statuses` constants and `scheduled?`/`sending?`/`completed?`/
+  `failed?` for comparison. Meta's default `fields` omit `id`, so
+  `List::Fields::ALL` is offered to ask for it. Every failure raises the new
+  `Whatsapp::Schedule::Error`.
+
 ## [0.6.0] - 2026-10-20
 
 Completes the Business-Scoped User ID (BSUID) work that 0.5.0 began. 0.5.0 covered the
@@ -20,7 +37,7 @@ button that asks a username adopter for their phone number back.
   actually work.
 - **Corrected `Status#recipient_user_id`'s documented behavior.** The docs and one spec
   claimed it appears only when you addressed a message to a BSUID. Per Meta's May 4, 2026
-  correction it is sent on *every* status however the message was addressed, and omitted
+  correction it is sent on _every_ status however the message was addressed, and omitted
   only on a `failed` status for a message sent to a phone number. The deserializer was
   always right; the claim around it was not. Also newly documented: the status webhook's
   `contacts[]` accompanies `sent`/`delivered`/`read` but is omitted entirely for `failed`,
@@ -36,7 +53,7 @@ button that asks a username adopter for their phone number back.
   reached every kind and `send_<kind>!` method without touching either. `envelope` compacts
   the recipient pair only, so an omitted identifier is left out rather than sent as null.
   `Messages::Response::Contacts` gains `user_id` and makes `wa_id` optional to match —
-  noting that Meta omits `user_id` whenever the message went to a phone number, *including*
+  noting that Meta omits `user_id` whenever the message went to a phone number, _including_
   when both identifiers were supplied, so a nil `user_id` does not mean the recipient has
   no BSUID. The BSUID is deliberately not format-checked: its canonical source is this
   gem's own webhook side, which keeps it a raw string, and rejecting on the way out what
@@ -93,7 +110,7 @@ button that asks a username adopter for their phone number back.
   when the business edits or revokes from the WhatsApp Business app.
 - **`Message::Base#group_id`**, set when an inbound message came from a group chat.
   Extracted once in `common_attributes`, so every message type has it. The matching
-  group-status identifiers on `Status` are deliberately *not* added, and are now recorded
+  group-status identifiers on `Status` are deliberately _not_ added, and are now recorded
   under a new "Not implemented" section in `lib/ruby/whatsapp/webhook/CLAUDE.md` along with
   the `calls` and `group_participants_update` fields: they only appear on a status for a
   message sent to a group, and this gem wraps no Groups API, so it can never receive one.
