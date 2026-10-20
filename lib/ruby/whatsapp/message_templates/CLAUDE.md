@@ -130,6 +130,10 @@ one, carrying fields the write side does not model. Running write-side rules ove
 we did not author would raise on perfectly valid responses. Read it as data; build a new
 `Template` to change something.
 
+**`Response::Paging` is shared.** `Schedule::Response::Collection` reuses it, because
+Graph API cursor paging is identical on both edges. Keep it free of anything
+template-specific.
+
 **`Example` raises `ArgumentError`, components convert it to a validation error.**
 `Component::Base#build_example_payload` rescues it into `@example_error`, which
 `validate_example_shape` reports. `Example` stays strict for direct use, while callers

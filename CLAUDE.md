@@ -45,6 +45,7 @@ This is a Ruby gem (`ruby-whatsapp`) providing a client for the Meta WhatsApp Cl
 - `Whatsapp::Media` — handles media upload, URL retrieval, download, and deletion via the API.
 - `Whatsapp::MessageTemplates` — full CRUD for the templates on a WhatsApp Business Account (create/list/find/update/delete, plus `upsert` and `create_from_library`). Addresses `waba_id`, not `phone_id`.
 - `Whatsapp::SubscribedApp` — subscribes/unsubscribes this app from a WABA's webhook notifications and lists who's subscribed, via `List`/`Subscribe`/`Unsubscribe`, one class per action. Addresses `waba_id`, like `MessageTemplates`.
+- `Whatsapp::Schedule` — lists and creates campaign schedules (an approved template sent to an audience at a set time) via `List`/`Create`, one class per action. Addresses `waba_id`, like `SubscribedApp`.
 - `Whatsapp::BusinessPhoneNumber` — onboards/deboards a phone number with Cloud API via `RequestCode`/`VerifyCode`/`Register`/`Deregister`, reads/writes the public profile a user sees via `Profile::Get`/`Profile::Update`, manages the searchable `@name` via `Username::Get`/`Claim`/`Delete`/`Suggest`, and forgets a stored user contact via `ContactBook::Delete`. All of those address `phone_id`, like `Media`/`Messages`, and share one `Transport`. Its `Account::Get`/`Account::Update` are the exception: they read and update the WABA node itself, so they address `waba_id`.
 
 **Message class hierarchy:**
@@ -84,6 +85,12 @@ All message classes require at least one recipient — `:to` (phone number) and/
 - Three independent, unrelated actions (no shared identity/validation the way `MessageTemplates`' CRUD verbs share a template concept), so each gets its own class rather than one class with several methods: `List` (GET), `Subscribe` (POST), `Unsubscribe` (DELETE). Every action is a stateless class-level `.call`, mirroring `Webhook::Verification.call`/`Webhook::Signature.valid?` rather than `Media`/`MessageTemplates`'s instance-holds-client shape.
 - `Transport` is `extend`ed by all three action classes for the one thing they share: building the WABA-scoped path; the `client.waba_id` guard itself comes from `Whatsapp::PathBuilding`.
 - Three response shapes, so `Response::{Collection,Subscription,Unsubscription}` rather than one class; `Response::App` (the flattened `whatsapp_business_api_data`) is composed by both `Collection` and `Subscription` rather than duplicated.
+
+**Campaign schedules:** `Whatsapp::Schedule` wraps the `schedules` edge — sending an already-approved template (`hsm_id`) to an audience at a Unix `delivery_time`, as opposed to `MessageTemplates`, which creates the template. See `lib/ruby/whatsapp/schedule/CLAUDE.md` and `docs/schedule/README.md`; in short:
+
+- One class per action like `SubscribedApp`, but two shapes: `List` is a stateless class-level `.call`; `Create` is a validated instance with a public `#serialize` (plus `.call`), since Meta documents all six body fields as required. Nothing else is checked — Meta publishes no length limits and no future-time rule.
+- `Response::{Collection,Node,Created}`, named after `MessageTemplates::Response`. `Collection#paging` reuses `MessageTemplates::Response::Paging` rather than duplicating it. `Node#status` stays a raw string, with `Statuses` constants and predicates for comparison.
+- Meta's default `fields` omit `id`; `List::Fields::ALL` asks for it.
 
 **Business phone numbers:** `Whatsapp::BusinessPhoneNumber` wraps a phone number's whole onboarding path with Cloud API — `RequestCode` → `VerifyCode` → `Register`, plus `Deregister` as the reverse switch — the prerequisite that makes sending, media, and templates work for it at all, as opposed to `Whatsapp::SubscribedApp`, which turns webhook delivery on/off for a whole WABA. See `lib/ruby/whatsapp/business_phone_number/CLAUDE.md`, `docs/business_phone_number/README.md`, `docs/business_phone_number/account.md`, and `docs/business_phone_number/profile.md`; in short:
 
