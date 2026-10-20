@@ -48,6 +48,7 @@ onboarding, and reading or updating the business account itself.
 - [🔔 Webhooks](#-webhooks)
 - [📷 Media](#-media)
 - [🔌 Subscribed Apps](#-subscribed-apps)
+- [📅 Scheduling Campaigns](#-scheduling-campaigns)
 - [📞 Business Phone Numbers](#-business-phone-numbers)
 - [🚨 Errors](#-errors)
 - [🧩 Compatibility](#-compatibility)
@@ -125,7 +126,7 @@ end
 phone_id  ──►  Messages · Media · BusinessPhoneNumber
                permission: whatsapp_business_messaging
 
-waba_id   ──►  MessageTemplates · SubscribedApp · BusinessPhoneNumber::Account
+waba_id   ──►  MessageTemplates · SubscribedApp · Schedule · BusinessPhoneNumber::Account
                permission: whatsapp_business_management
 ```
 
@@ -163,6 +164,7 @@ response.contacts.first.wa_id  # => "15551234567"
 | [**Webhooks**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/webhooks/README.md) | Install, verification, signatures, and all 21 notification fields |
 | [**Media**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/media/README.md) | Upload, download, delete, and the token-safety allowlist |
 | [**Subscribed Apps**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/subscribed_app/README.md) | Turning webhook delivery on and off for an account |
+| [**Campaign Schedules**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/schedule/README.md) | Sending an approved template to an audience at a set time |
 | [**Business Phone Numbers**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/README.md) | Onboarding: request code → verify → register |
 | [**Business Account**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/account.md) | Reading and updating the account: name, timezone, review status |
 | [**Business Profile**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/profile.md) | The profile a user sees: about, description, address, vertical, picture |
@@ -333,6 +335,26 @@ Tech Providers routing several accounts to different callback URLs pass an
 
 → **[Subscribed apps](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/subscribed_app/README.md)**
 
+## 📅 Scheduling Campaigns
+
+Send an approved template to an audience at a set time, and list what is scheduled:
+
+```ruby
+Whatsapp::Schedule::Create.call(
+  hsm_id: "1234567890", audience_id: "2345678901", waba_cs_id: "3456789012",
+  name: "Black Friday", description: "Black Friday promo to VIP customers",
+  delivery_time: Time.now.to_i + 3600
+).id                                                            # => "9876543210"
+
+page = Whatsapp::Schedule::List.call(fields: Whatsapp::Schedule::List::Fields::ALL, limit: 50)
+page.select(&:scheduled?).map(&:name)                           # => ["Black Friday"]
+Whatsapp::Schedule::List.call(after: page.next_cursor) if page.next_cursor
+```
+
+Meta's default fields leave out `id`, so ask for it with `fields:` when you need it.
+
+→ **[Campaign schedules](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/schedule/README.md)**
+
 ## 📞 Business Phone Numbers
 
 A phone number is unusable with Cloud API until it is **registered** — the prerequisite
@@ -425,6 +447,7 @@ you can rescue narrowly:
 | `Whatsapp::Media::MediaError` | Anything in `Media` |
 | `Whatsapp::MessageTemplates::TemplateError` | Anything in `MessageTemplates` |
 | `Whatsapp::SubscribedApp::Error` | Anything in `SubscribedApp` |
+| `Whatsapp::Schedule::Error` | Anything in `Schedule` |
 | `Whatsapp::BusinessPhoneNumber::Error` | Anything in `BusinessPhoneNumber`, including `Account` |
 
 Local validation failures raise `ActiveModel::ValidationError` instead — they happen at

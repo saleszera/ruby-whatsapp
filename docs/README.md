@@ -17,6 +17,7 @@ Full reference for [ruby-whatsapp](https://github.com/saleszera/ruby-whatsapp). 
 | [messages/](messages/README.md) | Sending every message kind, the shared envelope, responses |
 | [media/](media/README.md) | Upload, download, delete, and the token-safety allowlist |
 | [message_templates/](message_templates/README.md) | Creating and managing the templates you send |
+| [schedule/](schedule/README.md) | Scheduling an approved template to go out to an audience later |
 
 ### Message kinds
 

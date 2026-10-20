@@ -22,6 +22,7 @@ StandardError
     ├── Whatsapp::Media::MediaError                         any Media failure
     ├── Whatsapp::MessageTemplates::TemplateError           any template-management failure
     ├── Whatsapp::SubscribedApp::Error                      any subscribed-apps failure
+    ├── Whatsapp::Schedule::Error                           any campaign-schedule failure
     └── Whatsapp::BusinessPhoneNumber::Error                any phone-number-onboarding or account failure
 ```
 

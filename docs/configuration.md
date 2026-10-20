@@ -16,7 +16,7 @@ end
 | --- | --- | --- |
 | `api_key` | `nil` | Everything — a Meta system-user or app access token |
 | `phone_id` | `nil` | [Messages](messages/README.md), [media](media/README.md), [phone-number onboarding](business_phone_number/README.md) |
-| `waba_id` | `nil` | [Template management](message_templates/README.md), [subscribed apps](subscribed_app/README.md), [the business account](business_phone_number/account.md) |
+| `waba_id` | `nil` | [Template management](message_templates/README.md), [subscribed apps](subscribed_app/README.md), [campaign schedules](schedule/README.md), [the business account](business_phone_number/account.md) |
 | `verify_token` | `nil` | The [webhook GET handshake](webhooks/README.md#verification-the-get-handshake) |
 | `app_secret` | `nil` | [Webhook signature verification](webhooks/README.md#signature-the-post-check) |
 | `host` | `"https://graph.facebook.com"` | Overriding the API host |
@@ -51,9 +51,14 @@ phone_id  ──►  Messages          send_text!, send_template!, send_interact
 
 waba_id   ──►  MessageTemplates  create, list, find, update, delete, upsert
                SubscribedApp     List, Subscribe, Unsubscribe
+               Schedule          List, Create
                BusinessPhoneNumber::Account  Get, Update
                (permission: whatsapp_business_management)
 ```
+
+Meta's Schedules reference names no permission at all. `Schedule` is listed under
+`whatsapp_business_management` because it addresses the WABA like its neighbours, but
+that is an assumption, not something Meta documents.
 
 `BusinessPhoneNumber` is the one module that appears on both sides: its onboarding
 actions address a phone number, while its
