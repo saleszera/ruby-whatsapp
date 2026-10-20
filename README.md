@@ -133,6 +133,9 @@ waba_id   ──►  MessageTemplates · SubscribedApp · Schedule · BusinessPh
 `BusinessPhoneNumber` appears on both sides: its onboarding actions address a phone
 number, its `Account` actions the account that number belongs to.
 
+`Schedule`'s permission is an assumption: Meta's Schedules reference names none, so it
+is grouped under `whatsapp_business_management` only because it addresses the WABA.
+
 `api_key`, `app_secret`, and `verify_token` are redacted from `Configuration#inspect`
 and `Client#inspect`, so they will not leak into logs or error reports.
 
