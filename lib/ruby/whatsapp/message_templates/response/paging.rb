@@ -3,7 +3,8 @@
 module Whatsapp
   class MessageTemplates
     module Response
-      # Graph API cursor pagination for a template list.
+      # Graph API cursor pagination for a template list. Nothing in it is
+      # template-specific, so {Whatsapp::Schedule::Response::Collection} reuses it.
       #
       # Flattens the nested `paging.cursors` object, since the intermediate level
       # carries no information of its own.
