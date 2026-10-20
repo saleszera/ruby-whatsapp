@@ -30,7 +30,11 @@ module Whatsapp
         #   @return [String, nil] e.g. `"customer_changed_number"`, `"user_changed_user_id"`.
         attr_accessor :change_type
 
-        def initialize(body:, identity:, wa_id:, user_id:, parent_user_id:, change_type:, **base_attributes)
+        def initialize(
+          change_type:,
+          body: nil, identity: nil, wa_id: nil, user_id: nil, parent_user_id: nil,
+          **base_attributes
+        )
           super(**base_attributes)
 
           @body = body

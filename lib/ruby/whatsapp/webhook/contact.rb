@@ -11,7 +11,11 @@ module Whatsapp
       attr_accessor :profile_name
 
       # @!attribute [rw] username
-      #   @return [String, nil] Set only if the user has adopted a username.
+      #   @return [String, nil] Set only if the user has adopted a username. Read from
+      #     `profile.username`, where Meta's App Dashboard test payloads put it, falling
+      #     back to a flat top-level `username` — `user_id`/`parent_user_id` arrive flat
+      #     on this same hash and Meta publishes no reference schema for the contact
+      #     object, so both locations are read rather than betting on one.
       attr_accessor :username
 
       # @!attribute [rw] wa_id
@@ -27,7 +31,7 @@ module Whatsapp
       #   @return [String, nil] The user's parent BSUID, present only when enrolled.
       attr_accessor :parent_user_id
 
-      def initialize(profile_name:, username:, wa_id:, user_id:, parent_user_id:)
+      def initialize(profile_name: nil, username: nil, wa_id: nil, user_id: nil, parent_user_id: nil)
         @profile_name = profile_name
         @username = username
         @wa_id = wa_id
@@ -43,7 +47,7 @@ module Whatsapp
 
           new(
             profile_name: data.dig("profile", "name"),
-            username: data.dig("profile", "username"),
+            username: data.dig("profile", "username") || data["username"],
             wa_id: data["wa_id"],
             user_id: data["user_id"],
             parent_user_id: data["parent_user_id"]

@@ -31,7 +31,6 @@ RSpec.describe Whatsapp::Webhook::Message::Contacts do
           {
             "name" => { "first_name" => "Jane", "last_name" => "Doe", "formatted_name" => "Jane Doe" },
             "phones" => [{ "phone" => "12185551765", "wa_id" => "12185551765", "type" => "MOBILE" }],
-            "vcard" => nil,
             "origin" => "contact_request",
           },
         ]
@@ -41,6 +40,7 @@ RSpec.describe Whatsapp::Webhook::Message::Contacts do
       expect(message.from_user_id).to eq("US.13491208655302741918")
       expect(message.contacts.first.name.formatted_name).to eq("Jane Doe")
       expect(message.contacts.first.phones.first.phone).to eq("12185551765")
+      expect(message.contacts.first.phones.first.wa_id).to eq("12185551765")
       expect(message.contacts.first.origin).to eq("contact_request")
       expect(message.contacts.first.vcard).to be_nil
     end

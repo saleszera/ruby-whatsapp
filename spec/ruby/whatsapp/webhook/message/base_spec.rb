@@ -28,5 +28,50 @@ RSpec.describe Whatsapp::Webhook::Message::Base do
       expect(attributes[:from_user_id]).to be_nil
       expect(attributes[:from_parent_user_id]).to be_nil
     end
+
+    it "threads the quoted sender's BSUID through the deserialized context" do
+      attributes = described_class.common_attributes(
+        "type" => "text",
+        "from_user_id" => "US.13491208655302741918",
+        "context" => { "id" => "wamid.HBg", "from_user_id" => "US.99999999999999999999" }
+      )
+
+      expect(attributes[:context].from_user_id).to eq("US.99999999999999999999")
+    end
+
+    it "extracts group_id, so every message type learns it came from a group" do
+      attributes = described_class.common_attributes(
+        "from" => "16505551234",
+        "group_id" => "group.1",
+        "id" => "wamid.HBg",
+        "timestamp" => "1749416383",
+        "type" => "text"
+      )
+
+      expect(attributes[:group_id]).to eq("group.1")
+    end
+
+    it "leaves group_id nil for a one-to-one message" do
+      attributes = described_class.common_attributes(
+        "from" => "16505551234", "id" => "wamid.HBg", "timestamp" => "1749416383", "type" => "text"
+      )
+
+      expect(attributes[:group_id]).to be_nil
+    end
+  end
+
+  describe "#initialize" do
+    it "builds a message whose sender is only a BSUID" do
+      message = described_class.new(
+        id: "wamid.HBg", timestamp: "1504902988", type: "text",
+        from_user_id: "US.13491208655302741918"
+      )
+
+      expect(message.from_user_id).to eq("US.13491208655302741918")
+      expect(message.from).to be_nil
+      expect(message.from_parent_user_id).to be_nil
+      expect(message.context).to be_nil
+      expect(message.referral).to be_nil
+    end
   end
 end

@@ -41,5 +41,36 @@ RSpec.describe Whatsapp::Webhook::Contact do
       expect(contact.wa_id).to be_nil
       expect(contact.user_id).to eq("US.13491208655302741918")
     end
+
+    it "reads a top-level username when it is not nested under profile" do
+      contact = described_class.deserialize(
+        "profile" => { "name" => "test user name" },
+        "username" => "@testusername",
+        "user_id" => "US.13491208655302741918"
+      )
+
+      expect(contact.username).to eq("@testusername")
+    end
+
+    it "prefers the nested profile.username when both locations are present" do
+      contact = described_class.deserialize(
+        "profile" => { "name" => "test user name", "username" => "@nested" },
+        "username" => "@flat"
+      )
+
+      expect(contact.username).to eq("@nested")
+    end
+  end
+
+  describe "#initialize" do
+    it "builds from a BSUID-only identity, with no phone-number fields" do
+      contact = described_class.new(user_id: "US.13491208655302741918")
+
+      expect(contact.user_id).to eq("US.13491208655302741918")
+      expect(contact.profile_name).to be_nil
+      expect(contact.username).to be_nil
+      expect(contact.wa_id).to be_nil
+      expect(contact.parent_user_id).to be_nil
+    end
   end
 end

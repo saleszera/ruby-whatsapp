@@ -35,4 +35,20 @@ RSpec.describe Whatsapp::Webhook::Message::System do
       expect(message.parent_user_id).to eq("US.ENT.NEW")
     end
   end
+
+  describe "#initialize" do
+    it "builds a user_changed_user_id notice carrying only the new BSUID" do
+      message = described_class.new(
+        change_type: "user_changed_user_id", user_id: "US.NEW",
+        id: "wamid.HBg", timestamp: "1504902988", type: "system"
+      )
+
+      expect(message.change_type).to eq("user_changed_user_id")
+      expect(message.user_id).to eq("US.NEW")
+      expect(message.body).to be_nil
+      expect(message.identity).to be_nil
+      expect(message.wa_id).to be_nil
+      expect(message.parent_user_id).to be_nil
+    end
+  end
 end

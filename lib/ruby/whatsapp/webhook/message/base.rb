@@ -19,6 +19,12 @@ module Whatsapp
         #   @return [String, nil] The sender's parent BSUID, present only when enrolled.
         attr_accessor :from_parent_user_id
 
+        # @!attribute [rw] group_id
+        #   @return [String, nil] Set only when the message was sent in a group chat.
+        #     Reading groups works; this gem wraps no Groups API, so there is no way to
+        #     reply into one — the id is for correlation and for filtering group traffic out.
+        attr_accessor :group_id
+
         # @!attribute [rw] id
         #   @return [String, nil] The message's wamid.
         attr_accessor :id
@@ -39,10 +45,15 @@ module Whatsapp
         #   @return [Referral, nil]
         attr_accessor :referral
 
-        def initialize(from:, from_user_id:, from_parent_user_id:, id:, timestamp:, type:, context: nil, referral: nil)
+        def initialize(
+          id:, timestamp:, type:,
+          from: nil, from_user_id: nil, from_parent_user_id: nil, group_id: nil,
+          context: nil, referral: nil
+        )
           @from = from
           @from_user_id = from_user_id
           @from_parent_user_id = from_parent_user_id
+          @group_id = group_id
           @id = id
           @timestamp = timestamp
           @type = type
@@ -60,6 +71,7 @@ module Whatsapp
               from: data["from"],
               from_user_id: data["from_user_id"],
               from_parent_user_id: data["from_parent_user_id"],
+              group_id: data["group_id"],
               id: data["id"],
               timestamp: data["timestamp"],
               type: data["type"],

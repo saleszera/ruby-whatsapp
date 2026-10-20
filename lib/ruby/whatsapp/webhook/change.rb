@@ -2,7 +2,7 @@
 
 module Whatsapp
   module Webhook
-    # A single `entry[].changes[]` item: `field` names which of Meta's ~21 documented
+    # A single `entry[].changes[]` item: `field` names which of Meta's 21 documented
     # webhook notification types this is, `value` is the deserialized payload for it.
     #
     # `FIELDS` is populated incrementally as each field's value class is implemented
