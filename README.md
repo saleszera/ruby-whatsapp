@@ -71,9 +71,12 @@ onboarding, and reading or updating the business account itself.
   registration PIN.
 - **Inbound webhooks, fully typed.** An object tree for all 21 documented Meta
   notification fields, plus HMAC signature verification and a Rails controller
-  generator. Includes Business-Scoped User ID (BSUID) support, so a message still
-  identifies its sender once they adopt a username and their phone number disappears
-  from the payload.
+  generator.
+- **Usernames and BSUIDs, both directions.** Once a WhatsApp user adopts a username,
+  their phone number can vanish from your payloads. Inbound notifications still identify
+  their sender through a Business-Scoped User ID, and `recipient:` sends straight back to
+  one — so a BSUID read off a webhook can be replied to without ever knowing the number.
+  Your own business username is managed too, along with Meta's contact book.
 - **Persistent HTTP connections** via `HTTP.persistent`, reused across requests, with
   pluggable logging.
 - **Four runtime dependencies**, no Rails requirement. Rails integration activates
@@ -169,7 +172,13 @@ Or start at the [documentation index](https://github.com/saleszera/ruby-whatsapp
 
 ## 💬 Sending Messages
 
-Every registered kind gets its own `Whatsapp::Messages.send_<kind>!` class method:
+Every registered kind gets its own `Whatsapp::Messages.send_<kind>!` class method.
+Address a recipient by phone number, by BSUID, or both — at least one is required:
+
+```ruby
+Whatsapp::Messages.send_text!(to: "+15551234567", body: "Hi")                   # phone number
+Whatsapp::Messages.send_text!(recipient: "US.13491208655302741918", body: "Hi") # BSUID
+```
 
 ```ruby
 Whatsapp::Messages.send_interactive!(
@@ -247,7 +256,7 @@ plus list, find, update, and delete.
 
 ## 🔔 Webhooks
 
-Meta pushes inbound messages, delivery statuses, and ~18 other notification types to a
+Meta pushes inbound messages, delivery statuses, and 20 other notification types to a
 callback URL you register. Inside a Rails app:
 
 ```bash
@@ -285,7 +294,7 @@ message.body    # => "Does it come in another color?"
 ```
 
 All 21 documented fields get a class. `messages`, `user_id_update`, and
-`business_username_updates` have a Meta-published schema; the other 18 are best-effort
+`business_username_updates`, `user_preferences`, and `history` have a Meta-published schema; the other 16 are best-effort
 and flagged as such, per field.
 
 → **[Webhooks](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/webhooks/README.md)**
@@ -375,9 +384,34 @@ Whatsapp::BusinessPhoneNumber::Profile::Update.call(
 Character limits, the 21-value vertical enum, and the two-website cap are all checked
 before the request goes out.
 
+The **business username** — the searchable `@name` a user can find you by — is managed on
+the same `phone_id`:
+
+```ruby
+Whatsapp::BusinessPhoneNumber::Username::Suggest.call.to_a
+# => ["jaspersmarket", "jaspers_market"]   — names Meta reserved for you
+
+Whatsapp::BusinessPhoneNumber::Username::Claim.call(username: "jaspersmarket").reserved?
+# => true, until Meta makes the feature generally available
+
+Whatsapp::BusinessPhoneNumber::Username::Get.call.approved?  # => false, for now
+```
+
+Every one of Meta's format rules is checked locally first, so a name that was never going
+to be accepted doesn't cost you a rate-limited attempt. And Meta's **contact book** — the
+store that keeps putting a username adopter's phone number in your webhooks — can be
+pruned:
+
+```ruby
+result = Whatsapp::BusinessPhoneNumber::ContactBook::Delete.call(bsuid: "US.13491208655302741918")
+result.deleted  # => false means there was simply nothing stored, not a failure
+```
+
 → **[Business phone numbers](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/README.md)**
 · [the business account](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/account.md)
 · [the business profile](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/profile.md)
+· [business usernames](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/username.md)
+· [the contact book](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/contact_book.md)
 
 ## 🚨 Errors
 

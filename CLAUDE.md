@@ -45,7 +45,7 @@ This is a Ruby gem (`ruby-whatsapp`) providing a client for the Meta WhatsApp Cl
 - `Whatsapp::Media` — handles media upload, URL retrieval, download, and deletion via the API.
 - `Whatsapp::MessageTemplates` — full CRUD for the templates on a WhatsApp Business Account (create/list/find/update/delete, plus `upsert` and `create_from_library`). Addresses `waba_id`, not `phone_id`.
 - `Whatsapp::SubscribedApp` — subscribes/unsubscribes this app from a WABA's webhook notifications and lists who's subscribed, via `List`/`Subscribe`/`Unsubscribe`, one class per action. Addresses `waba_id`, like `MessageTemplates`.
-- `Whatsapp::BusinessPhoneNumber` — onboards/deboards a phone number with Cloud API via `RequestCode`/`VerifyCode`/`Register`/`Deregister`, and reads/writes the public profile a user sees via `Profile::Get`/`Profile::Update`. All of those address `phone_id`, like `Media`/`Messages`, and share one `Transport`. Its `Account::Get`/`Account::Update` are the exception: they read and update the WABA node itself, so they address `waba_id`.
+- `Whatsapp::BusinessPhoneNumber` — onboards/deboards a phone number with Cloud API via `RequestCode`/`VerifyCode`/`Register`/`Deregister`, reads/writes the public profile a user sees via `Profile::Get`/`Profile::Update`, manages the searchable `@name` via `Username::Get`/`Claim`/`Delete`/`Suggest`, and forgets a stored user contact via `ContactBook::Delete`. All of those address `phone_id`, like `Media`/`Messages`, and share one `Transport`. Its `Account::Get`/`Account::Update` are the exception: they read and update the WABA node itself, so they address `waba_id`.
 
 **Message class hierarchy:**
 
@@ -65,7 +65,7 @@ MarkMessageAsRead                     (no Base, no envelope — see messages/CLA
 
 There are **no stub classes** — every kind registered in `KINDS` is fully implemented.
 
-All message classes validate `:to` (recipient phone number) and implement `serialize` to build the API payload hash.
+All message classes require at least one recipient — `:to` (phone number) and/or `:recipient` (a Business-Scoped User ID, for a user who has adopted a username and whose phone number Meta no longer shares) — and implement `serialize` to build the API payload hash. `Messages::Base` owns that rule for all 13 kinds; each subclass forwards to it with `super(**)` and needs no recipient code of its own.
 
 **Response parsing:** `Messages::Response.deserialize` maps the API JSON response into `Response::Contacts` and `Response::Messages` objects.
 
@@ -95,8 +95,8 @@ All message classes validate `:to` (recipient phone number) and implement `seria
 
 **Webhooks (inbound):** `Whatsapp::Webhook` deserializes Meta's incoming webhook notifications — the opposite direction from everything above. See `lib/ruby/whatsapp/webhook/CLAUDE.md` for the full dispatch-table conventions and field reference; in short:
 
-- `Whatsapp::Webhook::Notification.deserialize(JSON.parse(body))` → `Entry[]` → `Change[]` (`field` + `value`), dispatched through a frozen `FIELDS` registry (mirrors `Messages::KINDS`) to one class per Meta-documented field. `messages`, `user_id_update`, and `business_username_updates` have a confirmed schema; the other 18 are best-effort.
-- Business-Scoped User IDs (BSUID): `messages`' `Contact`/`Message::Base`/`Status` all carry `user_id`/`from_user_id`/`recipient_user_id` (plus `parent_user_id` variants) alongside the phone-number identifiers, since a WhatsApp user's phone number can be absent once they adopt a username. See `lib/ruby/whatsapp/webhook/CLAUDE.md` and `docs/webhooks/messages.md#business-scoped-user-ids-bsuid`.
+- `Whatsapp::Webhook::Notification.deserialize(JSON.parse(body))` → `Entry[]` → `Change[]` (`field` + `value`), dispatched through a frozen `FIELDS` registry (mirrors `Messages::KINDS`) to one class per Meta-documented field. `messages`, `user_id_update`, `business_username_updates`, `user_preferences`, and `history` have a confirmed schema; the other 16 are best-effort (of those, `smb_message_echoes` and `smb_app_state_sync` now have a published entry shape but an inferred array key).
+- Business-Scoped User IDs (BSUID): `messages`' `Contact`/`Message::Base`/`Status` all carry `user_id`/`from_user_id`/`recipient_user_id` (plus `parent_user_id` variants) alongside the phone-number identifiers, since a WhatsApp user's phone number can be absent once they adopt a username. The write side is `Messages::Base#recipient` (and `Response::Contacts#user_id`), so a BSUID read off a webhook can be replied to directly. See `lib/ruby/whatsapp/webhook/CLAUDE.md`, `docs/webhooks/messages.md#business-scoped-user-ids-bsuid`, and `docs/messages/README.md#addressing-to-recipient-or-both`.
 - `Whatsapp::Webhook::Verification.call(params:)` / `Whatsapp::Webhook::Signature.valid?(payload:, header:)` handle the GET handshake and the `X-Hub-Signature-256` HMAC check, both defaulting to `Whatsapp.configuration.verify_token`/`app_secret` but overridable per call (for multi-tenant apps with per-account credentials).
 - `rake whatsapp:install:webhook` (via `Whatsapp::Railtie`, only active when Rails is loaded) copies a personalizable `app/controllers/whatsapp/webhooks_controller.rb` into the host app using `Whatsapp::Webhook::Installer`.
 
