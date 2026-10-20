@@ -46,7 +46,68 @@ RSpec.describe Whatsapp::Messages::Interactive do
 
     it "requires a recipient" do
       expect { described_class.new(type: :reply_buttons, body: "x", action: {}) }
-        .to raise_error(ArgumentError, /missing keyword: :?to/)
+        .to raise_error(ActiveModel::ValidationError, /at least one of to or recipient/)
+    end
+
+    it "accepts a BSUID recipient in place of a phone number" do
+      expect do
+        described_class.new(
+          recipient: "US.13491208655302741918", type: :reply_buttons, body: "x",
+          action: { buttons: [{ id: "1", title: "Yes" }] }
+        )
+      end.not_to raise_error
+    end
+
+    describe "request_contact_info" do
+      let(:message) do
+        described_class.new(recipient: "US.13491208655302741918", type: :request_contact_info,
+          body: "Mind sharing your number so we can text you the code?")
+      end
+
+      it "needs no action, being the one kind with nothing to supply" do
+        expect { message }.not_to raise_error
+      end
+
+      it "serializes as an interactive message naming the action twice, as Meta does" do
+        payload = message.serialize
+
+        expect(payload[:type]).to eq("interactive")
+        expect(payload[:recipient]).to eq("US.13491208655302741918")
+        expect(payload[:interactive][:type]).to eq("request_contact_info")
+        expect(payload[:interactive][:body]).to eq(text: "Mind sharing your number so we can text you the code?")
+        expect(payload[:interactive][:action]).to eq(name: "request_contact_info")
+      end
+
+      it "omits the header and footer Meta's example does not show" do
+        expect(message.serialize[:interactive]).not_to have_key(:header)
+        expect(message.serialize[:interactive]).not_to have_key(:footer)
+      end
+
+      it "produces the same payload when the action is spelled out" do
+        explicit = described_class.new(recipient: "US.13491208655302741918", type: :request_contact_info,
+          body: "Mind sharing your number so we can text you the code?",
+          action: { name: "request_contact_info" })
+
+        expect(explicit.serialize).to eq(message.serialize)
+      end
+
+      it "still requires a body" do
+        expect do
+          described_class.new(recipient: "US.13491208655302741918", type: :request_contact_info, body: nil)
+        end.to raise_error(ActiveModel::ValidationError, /Body can't be blank/)
+      end
+    end
+
+    it "still requires an action for every other kind" do
+      expect { described_class.new(to: "+1555", type: :reply_buttons, body: "x") }
+        .to raise_error(ActiveModel::ValidationError, /Action can't be blank/)
+    end
+
+    # The action validator reads ACTION_TYPES with [] rather than fetch, so an unknown
+    # type reaches the inclusion validator instead of raising KeyError from inside one.
+    it "reports an unknown type as a validation error, not a KeyError" do
+      expect { described_class.new(to: "+1555", type: :telepathy, body: "x") }
+        .to raise_error(ActiveModel::ValidationError, /Type is not included in the list/)
     end
   end
 end
