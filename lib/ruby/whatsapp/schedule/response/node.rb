@@ -27,7 +27,8 @@ module Whatsapp
         attr_accessor :delivery_time
 
         # @!attribute [rw] status
-        #   @return [String, nil] One of {Statuses::ALL}.
+        #   @return [String, nil] The raw status string Meta sent; {Statuses::ALL} lists the
+        #     documented values, and anything else is kept as-is.
         attr_accessor :status
 
         # @param id [String, nil]
