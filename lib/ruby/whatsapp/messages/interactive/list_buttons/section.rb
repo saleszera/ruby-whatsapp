@@ -14,21 +14,26 @@ module Whatsapp
           end
 
           # @!attribute [rw] title
-          #   @return [String]
+          #   @return [String, nil]
           attr_accessor :title
 
           # @!attribute [rw] rows
           #   @return [Array<Hash>]
           attr_accessor :rows
 
-          validates :title, presence: true, length: { maximum: Defaults::MAX_TITLE_LENGTH }
+          # Optional here: Meta requires a title only when the list has more than one
+          # section, which a lone Section cannot see — {ListButtons} enforces that rule.
+          validates :title, length: { maximum: Defaults::MAX_TITLE_LENGTH }, allow_nil: true
           validates :rows, presence: true, length: { minimum: Defaults::MIN_ROWS_LENGTH, maximum: Defaults::MAX_ROWS_LENGTH }
 
-          # @param title [String] The title of the section.
+          # A blank title (`""` or whitespace) is treated as absent, so it is omitted from
+          # the payload rather than sent as an empty heading.
           # @param rows [Array<Hash>] The rows in the section.
+          # @param title [String, nil] The title of the section. Required only when the list
+          #   has more than one section (enforced by {ListButtons}).
           #  @raise [ActiveModel::ValidationError] if validation fails.
-          def initialize(title:, rows:)
-            @title = title
+          def initialize(rows:, title: nil)
+            @title = title.presence
             @rows = rows
 
             validate!
@@ -47,7 +52,7 @@ module Whatsapp
             {
               title:,
               rows: serialized_rows,
-            }
+            }.compact
           end
 
         private

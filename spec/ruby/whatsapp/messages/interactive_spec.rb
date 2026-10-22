@@ -36,6 +36,33 @@ RSpec.describe Whatsapp::Messages::Interactive do
       expect(out[:header]).to eq(type: "text", text: "Hi")
       expect(out[:footer]).to eq(text: "bye")
     end
+
+    # Meta requires sections[].title only once a list has more than one section.
+    it "serializes a single-section list without a section title" do
+      msg = described_class.new(
+        to: "+1", type: :list_buttons, body: "Choose a drink",
+        action: { button: "Menu", sections: [{ rows: [{ id: "espresso", title: "Espresso" }] }] }
+      )
+
+      expect(msg.serialize[:interactive][:action])
+        .to eq(button: "Menu", sections: [{ rows: [{ id: "espresso", title: "Espresso" }] }])
+    end
+
+    it "rejects an untitled section in a multi-section list when serialized" do
+      msg = described_class.new(
+        to: "+1", type: :list_buttons, body: "Choose a drink",
+        action: {
+          button: "Menu",
+          sections: [
+            { title: "Coffee", rows: [{ id: "espresso", title: "Espresso" }] },
+            { rows: [{ id: "water", title: "Water" }] },
+          ],
+        }
+      )
+
+      expect { msg.serialize }
+        .to raise_error(ActiveModel::ValidationError, /Sections must each have a title/)
+    end
   end
 
   describe "validation" do

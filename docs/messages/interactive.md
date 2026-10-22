@@ -116,7 +116,7 @@ Whatsapp::Messages.send_interactive!(
 | --- | --- |
 | `button` | Required, max **20** characters — the label that opens the list |
 | `sections` | **1–10** sections |
-| `sections[].title` | Required, max **24** characters |
+| `sections[].title` | Required only when there is **more than one** section, max **24** characters. A blank title counts as absent and is omitted |
 | `sections[].rows` | **1–10** rows |
 | `rows[].id` | Required, max **200** characters |
 | `rows[].title` | Required, max **24** characters |
@@ -134,6 +134,25 @@ Whatsapp::Messages::Interactive.new(
 #                sections: [{ title: "Coffee",
 #                             rows: [{ id: "espresso", title: "Espresso",
 #                                      description: "Strong & short" }] }] } } }
+```
+
+A list with a single section can leave its title out, and the `title` key is then
+omitted from the payload. Once there are two or more sections, each one needs a title:
+
+```ruby
+Whatsapp::Messages::Interactive.new(
+  to: "+15551234567", type: :list_buttons, body: "Pick a time slot",
+  action: { button: "Slots", sections: [
+    { rows: [{ id: "9am", title: "09:00" }, { id: "2pm", title: "14:00" }] },
+  ] }
+).serialize
+# => { ..., interactive: { type: "list", body: { text: "Pick a time slot" },
+#      action: { button: "Slots",
+#                sections: [{ rows: [{ id: "9am", title: "09:00" },
+#                                    { id: "2pm", title: "14:00" }] }] } } }
+
+# Two sections, one untitled:
+# => ActiveModel::ValidationError: Sections must each have a title when there is more than one section
 ```
 
 A tap arrives back as a webhook `Message::Interactive` with

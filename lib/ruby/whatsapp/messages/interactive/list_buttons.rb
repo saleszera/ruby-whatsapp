@@ -23,6 +23,7 @@ module Whatsapp
         validates :button, presence: true, length: { maximum: Defaults::MAX_BUTTON_LENGTH }
         validates :sections, presence: true, length: { minimum: Defaults::MIN_SECTIONS_COUNT,
                                                        maximum: Defaults::MAX_SECTIONS_COUNT, }
+        validate :validate_section_titles
 
         # @param button [String] The text for the list button.
         # @param sections [Array<Hash>] The sections of the list button.
@@ -51,6 +52,17 @@ module Whatsapp
         end
 
       private
+
+        # Meta requires `sections[].title` only once a list has more than one section, so
+        # {Section} leaves it optional and the rule lives here, where the count is known.
+        # A blank title counts as missing, matching {Section}, which omits it.
+        # @return [void]
+        def validate_section_titles
+          return if sections.blank? || sections.size <= 1
+          return if sections.all? { |section| section[:title].present? }
+
+          errors.add(:sections, "must each have a title when there is more than one section")
+        end
 
         # @return [Array<Hash>] Serialized sections.
         #   @raise [ActiveModel::ValidationError] if validation fails.
