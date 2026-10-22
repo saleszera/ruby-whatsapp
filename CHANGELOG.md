@@ -1,4 +1,19 @@
-## [0.6.1]
+## [0.6.2] - 2026-10-22
+
+### Fixed
+
+- **A single-section list message no longer needs a section title.** Meta requires
+  `sections[].title` only when a list has more than one section, but
+  `Interactive::ListButtons::Section` demanded one always — `title:` was a required
+  keyword with a presence validation — so a valid single-section list without a title
+  could not be built. `Section` now takes `title:` as optional (still max 24 characters)
+  and omits the key from the payload when it is absent, and `ListButtons` enforces Meta's
+  actual rule: with two or more sections, every one must have a title, otherwise it fails
+  with "Sections must each have a title when there is more than one section". A blank
+  title (`""` or whitespace) is treated as absent — omitted from a single section, and
+  counted as missing when there are several — rather than sent as an empty heading.
+
+## [0.6.1] - 2026-10-21
 
 ### Added
 
