@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Whatsapp::Messages::Interactive do
+  let(:product_cards) { { cards: [{ catalog_id: "1", product_retailer_id: "a" }] * 2 } }
   let(:common) do
     { to: "+1", body: "Pick one", action: { buttons: [{ id: "a", title: "A" }] } }
   end
@@ -37,6 +38,32 @@ RSpec.describe Whatsapp::Messages::Interactive do
       expect(out[:footer]).to eq(text: "bye")
     end
 
+    # Both carousels are `interactive.type: "carousel"`; `product_list` is a different
+    # (multi-product) message.
+    # See https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-product-carousel-messages
+    it "emits carousel as the wire type of a product carousel" do
+      msg = described_class.new(
+        to: "+1", type: :product_carousel, body: "Recommended for you",
+        action: product_cards
+      )
+
+      expect(msg.serialize[:interactive][:type]).to eq("carousel")
+    end
+
+    # Neither carousel supports a message-level header or footer.
+    # See https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-media-carousel-messages
+    it "rejects a header or footer on a carousel" do
+      carousel = {
+        to: "+1", type: :product_carousel, body: "Recommended for you",
+        action: product_cards,
+      }
+
+      expect { described_class.new(**carousel, footer: { text: "bye" }) }
+        .to raise_error(ActiveModel::ValidationError, /Footer is not supported on a product_carousel message/)
+      expect { described_class.new(**carousel, header: { type: "text", text: "Hi" }) }
+        .to raise_error(ActiveModel::ValidationError, /Header is not supported on a product_carousel message/)
+    end
+
     # Meta requires sections[].title only once a list has more than one section.
     it "serializes a single-section list without a section title" do
       msg = described_class.new(
@@ -48,20 +75,71 @@ RSpec.describe Whatsapp::Messages::Interactive do
         .to eq(button: "Menu", sections: [{ rows: [{ id: "espresso", title: "Espresso" }] }])
     end
 
-    it "rejects an untitled section in a multi-section list when serialized" do
-      msg = described_class.new(
-        to: "+1", type: :list_buttons, body: "Choose a drink",
-        action: {
-          button: "Menu",
-          sections: [
-            { title: "Coffee", rows: [{ id: "espresso", title: "Espresso" }] },
-            { rows: [{ id: "water", title: "Water" }] },
-          ],
-        }
-      )
+    # See https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-list-messages
+    it "rejects an untitled section in a multi-section list on construction" do
+      expect do
+        described_class.new(
+          to: "+1", type: :list_buttons, body: "Choose a drink",
+          action: {
+            button: "Menu",
+            sections: [
+              { title: "Coffee", rows: [{ id: "espresso", title: "Espresso" }] },
+              { rows: [{ id: "water", title: "Water" }] },
+            ],
+          }
+        )
+      end.to raise_error(ActiveModel::ValidationError, /Sections must each have a title/)
+    end
+  end
 
-      expect { msg.serialize }
-        .to raise_error(ActiveModel::ValidationError, /Sections must each have a title/)
+  # Every other message kind is fully validated by the time `new` returns; the nested
+  # header, body, footer and action must be too, or `valid?` reports true for a payload
+  # that `serialize` (and so `send!`) would then refuse.
+  describe "validation of nested parts" do
+    def build(**overrides)
+      described_class.new(type: :reply_buttons, **common, **overrides)
+    end
+
+    # Reply-button titles are at most 20 characters and ids are required.
+    # See https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-reply-buttons-messages
+    it "rejects an invalid action on construction" do
+      expect { build(action: { buttons: [{ id: "", title: "" }] }) }
+        .to raise_error(ActiveModel::ValidationError, /Action is invalid:/)
+    end
+
+    it "is not valid? once a nested part has become invalid" do
+      message = build
+      message.action = { buttons: [{ id: "a", title: "x" * 21 }] }
+
+      expect(message).not_to be_valid
+      expect(message.errors[:action].first).to include("is too long")
+    end
+
+    # Body text is at most 1024 characters.
+    it "rejects a body over 1024 characters on construction" do
+      expect { build(body: "x" * 1025) }
+        .to raise_error(ActiveModel::ValidationError, /Body is invalid: Text is too long/)
+    end
+
+    # Footer text is at most 60 characters.
+    it "rejects a footer over 60 characters on construction" do
+      expect { build(footer: { text: "x" * 61 }) }
+        .to raise_error(ActiveModel::ValidationError, /Footer is invalid: Text is too long/)
+    end
+
+    it "rejects an incomplete header on construction" do
+      expect { build(header: { type: "text" }) }
+        .to raise_error(ActiveModel::ValidationError, /Header is invalid: Text content is required/)
+    end
+
+    it "reports an unknown action keyword as a validation error, not an ArgumentError" do
+      expect { build(action: { buttons: [{ id: "a", title: "A" }], colour: "red" }) }
+        .to raise_error(ActiveModel::ValidationError, /Action is invalid: unknown keyword: :colour/)
+    end
+
+    it "reports a missing type as a validation error, not a NoMethodError" do
+      expect { described_class.new(type: nil, **common) }
+        .to raise_error(ActiveModel::ValidationError, /Type can't be blank/)
     end
   end
 

@@ -76,6 +76,17 @@ RSpec.describe Whatsapp::MessageTemplates::Component::Carousel::Card do
     end
   end
 
+  # See https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates/components/#named-parameters
+  describe "parameter format of an already-built body" do
+    it "rejects a body whose placeholders use a different parameter format" do
+      body = Whatsapp::MessageTemplates::Component::Body.new(text: "Rare {{1}} in stock!", example: ["Tulips"])
+
+      expect { described_class.new(header:, body:, parameter_format: :named) }
+        .to raise_error(ActiveModel::ValidationError,
+          /Body was built with parameter_format POSITIONAL, but the template uses NAMED/)
+    end
+  end
+
   describe "#signature" do
     it "matches for cards with the same structure" do
       a = described_class.new(header:, buttons:)

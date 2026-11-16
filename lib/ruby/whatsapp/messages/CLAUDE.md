@@ -224,8 +224,8 @@ ACTION_TYPES = {
   reply_buttons:    { klass: ReplyButtons,    api_type: "button" },
   list_buttons:     { klass: ListButtons,     api_type: "list" },
   url_button:       { klass: UrlButton,       api_type: "cta_url" },
-  media_carousel:   { klass: MediaCarousel,   api_type: "carousel" },
-  product_carousel: { klass: ProductCarousel, api_type: "product_list" },
+  media_carousel:   { klass: MediaCarousel,   api_type: "carousel", body_only: true },
+  product_carousel: { klass: ProductCarousel, api_type: "carousel", body_only: true },
   request_contact_info: { klass: RequestContactInfo, api_type: "request_contact_info",
                           parameterless: true },
 }
@@ -272,9 +272,13 @@ Whatsapp::Messages::Interactive.new(
 #      action: { name: "cta_url", parameters: { display_text: "Shop now", url: "https://example.com/new" } } } }
 ```
 
-**`:media_carousel`** — 2 to 10 swipeable cards, each with its own header/body/CTA/quick-replies. **Note:** the wire value `"carousel"` is flagged in the source as worth double-checking against Meta's docs for your API version before relying on it in production.
+**`:media_carousel`** — 2 to 10 swipeable cards. Each has an image/video header, an optional body (≤ 160 chars, ≤ 2 line breaks), and **either** one URL button (`action:`) **or** quick replies (`buttons:`), both serialized inside the card's `action` as Meta requires. All cards must share the same button type and count.
 
-**`:product_carousel`** — 2 to 10 cards referencing products in a Meta catalog (`catalog_id:`/`product_retailer_id:` per card). Same caveat applies to the wire value `"product_list"`.
+**`:product_carousel`** — 2 to 10 cards referencing products in **one** Meta catalog (`catalog_id:`/`product_retailer_id:` per card). Wire type is `"carousel"`, the same as the media carousel — `"product_list"` is the unrelated multi-product message.
+
+Both carousels are `body_only`: Meta rejects a message-level `header`/`footer` on them, so `#validate_body_only` does too.
+
+**Nested parts are validated on construction.** `#validate_parts` runs the same `part_builders` that `#interactive_payload` serializes with, and reports anything they raise (a nested `ValidationError`, an unknown keyword, a non-Hash, an incomplete header) as an error on that part. So `valid?` is true only when `serialize` will succeed.
 
 ### Mark Message As Read (`mark_message_as_read.rb`)
 

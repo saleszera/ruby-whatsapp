@@ -9,6 +9,12 @@ module Whatsapp
         TYPE = "reaction"
       end
 
+      # Exactly one user-perceived character (grapheme cluster) that is an emoji: any
+      # cluster containing a pictographic code point (which covers skin tones, ZWJ
+      # sequences and variation selectors), a regional-indicator flag pair, or a keycap.
+      # `\p{Emoji}` alone is not enough — it also matches the ASCII digits, `#` and `*`.
+      EMOJI_PATTERN = /\A(?=\X\z)(?:.*\p{Extended_Pictographic}.*|\p{Regional_Indicator}{2}|[0-9#*]\uFE0F?\u20E3)\z/m
+
       # @!attribute [rw] message_id
       #   @return [String]
       attr_accessor :message_id
@@ -18,7 +24,7 @@ module Whatsapp
       attr_accessor :emoji
 
       validates :message_id, presence: true
-      validate :emoji_unicode
+      validate :validate_emoji
 
       # @param message_id [String] The ID of the message being reacted to.
       # @param emoji [String] The emoji used for the reaction.
@@ -41,20 +47,15 @@ module Whatsapp
 
     private
 
-      # Validates that the emoji is a valid Unicode emoji character.
+      # An empty string is allowed, to remove a previously sent reaction. (Meta's
+      # reaction page does not currently describe removal; this keeps the behavior the
+      # gem has always documented.)
       # @return [void]
-      # @raise [ActiveModel::ValidationError] if the emoji is not valid.
-      def emoji_unicode
-        if @emoji.nil?
-          errors.add(:emoji, "can't be nil")
-          return
-        end
+      def validate_emoji
+        return errors.add(:emoji, :blank, message: "can't be nil") if emoji.nil?
+        return if emoji.empty? || emoji.match?(EMOJI_PATTERN)
 
-        # An empty string is valid: it removes a previously sent reaction.
-        return if @emoji.empty?
-        return if @emoji.match?(/\p{Emoji}/)
-
-        errors.add(:emoji, "must be a valid emoji character")
+        errors.add(:emoji, :invalid, message: "must be a single emoji")
       end
     end
   end

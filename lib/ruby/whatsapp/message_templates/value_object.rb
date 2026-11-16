@@ -57,6 +57,21 @@ module Whatsapp
       def reject_unsupported(field, reason)
         errors.add(field, reason) unless blank_value?(public_send(field))
       end
+
+      # The already-built children whose placeholders were built for a different
+      # parameter format than this object's.
+      #
+      # A child built from a Hash inherits this object's format, but one passed in
+      # already built keeps its own, and its example key (`body_text` versus
+      # `body_text_named_params`) was fixed when it was built. Each container reports
+      # these in its own words, since only it knows what to call the child.
+      # @param children [Array<#placeholders?, #parameter_format>]
+      # @return [Array]
+      def parameter_format_mismatches(children)
+        Array(children).compact.select do |child|
+          child.placeholders? && child.parameter_format != parameter_format
+        end
+      end
     end
   end
 end

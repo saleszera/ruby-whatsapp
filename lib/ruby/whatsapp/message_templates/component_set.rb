@@ -75,6 +75,7 @@ module Whatsapp
       validate :validate_location_header
       validate :validate_request_contact_info_category
       validate :validate_limited_time_offer
+      validate :validate_parameter_formats
 
       # @param components [Array<Hash, Component::Base>] The template's components.
       # @param category [String, Symbol, nil] The owning template's category. Omit to
@@ -115,6 +116,15 @@ module Whatsapp
           next component if component.is_a?(Component::Base)
 
           Component.build(**component, parameter_format:)
+        end
+      end
+
+      # @return [void]
+      def validate_parameter_formats
+        parameter_format_mismatches(components).each do |component|
+          errors.add(:components,
+            "contain a #{component.api_type} built with parameter_format #{component.parameter_format}, " \
+              "but the template uses #{parameter_format}")
         end
       end
 

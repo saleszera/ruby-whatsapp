@@ -23,6 +23,28 @@ RSpec.describe Whatsapp::Client do
     end
   end
 
+  # The connection bakes in the host and bearer token, so changing either afterwards
+  # must rebuild it rather than keep sending the old values.
+  describe "changing connection settings after the first request" do
+    before { client.connection }
+
+    it "sends a rotated api_key" do
+      client.api_key = "ROTATED_TOKEN"
+
+      expect(client.connection.default_options.headers["Authorization"]).to eq("Bearer ROTATED_TOKEN")
+    end
+
+    it "targets a changed host" do
+      client.host = "https://graph.example.test"
+
+      expect(client.connection.default_options.persistent).to eq("https://graph.example.test")
+    end
+
+    it "keeps the same connection when nothing it depends on changed" do
+      expect { client.phone_id = "OTHER_PHONE" }.not_to(change { client.connection.object_id })
+    end
+  end
+
   describe "#path_for" do
     it "prefixes the API version for resource paths" do
       expect(client.path_for("PHONE_ID", "messages")).to eq("/v24.0/PHONE_ID/messages")

@@ -42,6 +42,13 @@ RSpec.describe Whatsapp::Media do
       file&.unlink
     end
 
+    it "refuses to upload without a phone_id instead of posting to a malformed path" do
+      unconfigured = described_class.new(client: Whatsapp::Client.new(phone_id: nil))
+
+      expect { unconfigured.upload(file_path: __FILE__, type: "text/plain") }
+        .to raise_error(Whatsapp::Media::MediaError, /phone_id is required for media upload/)
+    end
+
     it "raises when the file does not exist" do
       expect { media.upload(file_path: "/no/such/file.jpg", type: "image/jpeg") }
         .to raise_error(Whatsapp::Media::MediaError, /File not found/)
@@ -56,6 +63,31 @@ RSpec.describe Whatsapp::Media do
           headers: { "Content-Type" => "application/json" })
 
       expect(media.get_url(media_id: "MEDIA_ID")).to include("url" => "https://lookaside.fbsbx.com/m/1")
+    end
+  end
+
+  # `phone_number_id` is optional on retrieve and delete; when given, Meta only
+  # processes the request if it matches the number the media was uploaded on.
+  # See https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media
+  describe "without a configured phone_id" do
+    subject(:media) { described_class.new(client: Whatsapp::Client.new(phone_id: nil)) }
+
+    it "retrieves the media URL without a phone_number_id query parameter" do
+      stub = stub_request(:get, "https://graph.facebook.com/v24.0/MEDIA_ID")
+        .to_return(status: 200, body: { url: "https://lookaside.fbsbx.com/m/1" }.to_json,
+          headers: { "Content-Type" => "application/json" })
+
+      media.get_url(media_id: "MEDIA_ID")
+
+      expect(stub).to have_been_requested
+    end
+
+    it "deletes the media without a phone_number_id query parameter" do
+      stub = stub_request(:delete, "https://graph.facebook.com/v24.0/MEDIA_ID")
+        .to_return(status: 200, body: { success: true }.to_json, headers: { "Content-Type" => "application/json" })
+
+      expect(media.delete(media_id: "MEDIA_ID")).to be(true)
+      expect(stub).to have_been_requested
     end
   end
 

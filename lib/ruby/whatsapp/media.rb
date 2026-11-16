@@ -5,6 +5,7 @@ module Whatsapp
   # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media
   class Media
     include ResponseHandling
+    include PathBuilding
 
     class MediaError < Whatsapp::Error; end
 
@@ -24,12 +25,12 @@ module Whatsapp
     # @param file_path [String] Path to the file to upload
     # @param type [String] MIME type of the file (e.g., "image/jpeg", "video/mp4")
     # @return [String] The media ID
-    # @raise [MediaError] if the file is missing or the upload fails
+    # @raise [MediaError] if the file is missing, no phone ID is configured, or the upload fails
     def upload(file_path:, type:)
       raise MediaError, "File not found: #{file_path}" unless File.exist?(file_path)
 
       response = client.connection.post(
-        client.path_for(client.phone_id, "media"),
+        scoped_path(client, :phone_id, "media", error_class: MediaError, purpose: "media upload"),
         form: {
           messaging_product: "whatsapp",
           file: HTTP::FormData::File.new(file_path, content_type: type),
@@ -46,7 +47,7 @@ module Whatsapp
     def get_url(media_id:)
       response = client.connection.get(
         client.path_for(media_id),
-        params: { phone_number_id: client.phone_id }
+        params: phone_number_params
       )
 
       parse_json(handle_response!(response, error_class: MediaError, action: "get media URL"))
@@ -82,7 +83,7 @@ module Whatsapp
     def delete(media_id:)
       response = client.connection.delete(
         client.path_for(media_id),
-        params: { phone_number_id: client.phone_id }
+        params: phone_number_params
       )
 
       parsed = parse_json(handle_response!(response, error_class: MediaError, action: "delete media"))
@@ -90,6 +91,16 @@ module Whatsapp
     end
 
   private
+
+    # Meta treats `phone_number_id` as optional on retrieve and delete; when sent, the
+    # request is only processed if it matches the number the media was uploaded on.
+    # It is omitted rather than sent empty when no phone ID is configured.
+    # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media
+    # @return [Hash]
+    def phone_number_params
+      phone_id = client.phone_id
+      phone_id.nil? || phone_id.to_s.empty? ? {} : { phone_number_id: phone_id }
+    end
 
     # Parses and validates a download URL (HTTPS + allowlisted host).
     # @return [URI::HTTPS]

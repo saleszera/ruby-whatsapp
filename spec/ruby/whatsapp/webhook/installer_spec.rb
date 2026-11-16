@@ -37,4 +37,17 @@ RSpec.describe Whatsapp::Webhook::Installer do
       expect(File.read(destination)).to eq("# customized by the developer")
     end
   end
+
+  # A `Webhook::Change` is a plain Ruby object, not something ActiveJob can serialize,
+  # so the suggested `perform_later(change)` raises ActiveJob::SerializationError.
+  # Fixed together with the generator rewrite; `pending` fails loudly once it passes.
+  describe "the controller template" do
+    let(:template) { File.read(described_class::TEMPLATE_PATH) }
+
+    it "never suggests enqueuing a deserialized Change" do
+      pending "fixed with the Rails generator rewrite"
+
+      expect(template).not_to include("perform_later(change)")
+    end
+  end
 end

@@ -31,6 +31,35 @@ RSpec.describe Whatsapp::MessageTemplates::ComponentSet do
     end
   end
 
+  # The example key Meta expects (`body_text` vs `body_text_named_params`) is fixed by the
+  # template's parameter format, so a component built for the other format would be sent
+  # with an example Meta cannot match to the template.
+  # See https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates/components/#named-parameters
+  describe "parameter format of already-built components" do
+    let(:formats) { Whatsapp::MessageTemplates::ParameterFormats }
+    let(:component) { Whatsapp::MessageTemplates::Component }
+
+    it "rejects a pre-built component whose placeholders use a different parameter format" do
+      positional = component::Body.new(text: "Hi {{1}}", example: ["Pablo"])
+
+      expect { described_class.new(components: [positional], parameter_format: formats::NAMED) }
+        .to raise_error(ActiveModel::ValidationError,
+          /Components contain a BODY built with parameter_format POSITIONAL, but the template uses NAMED/)
+    end
+
+    it "accepts a pre-built component whose parameter format matches" do
+      named = component::Body.new(text: "Hi {{name}}", example: { name: "Pablo" }, parameter_format: formats::NAMED)
+
+      expect { described_class.new(components: [named], parameter_format: formats::NAMED) }.not_to raise_error
+    end
+
+    it "accepts a pre-built component with no placeholders, whatever format it was built with" do
+      plain = component::Body.new(text: "Hi there")
+
+      expect { described_class.new(components: [plain], parameter_format: formats::NAMED) }.not_to raise_error
+    end
+  end
+
   describe "structural rules" do
     it "requires a body" do
       expect { described_class.new(components: [{ type: :footer, text: "Bye" }]) }

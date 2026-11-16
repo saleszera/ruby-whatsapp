@@ -13,7 +13,7 @@ Unlike every other kind, `Interactive` is a **single class** that dispatches on
 | `:list_buttons` | `"list"` | [A button expanding into sections of rows](#list) |
 | `:url_button` | `"cta_url"` | [A link rendered as a button](#cta-url-button) |
 | `:media_carousel` | `"carousel"` | [2–10 swipeable media cards](#media-carousel) |
-| `:product_carousel` | `"product_list"` | [2–10 catalog product cards](#product-carousel) |
+| `:product_carousel` | `"carousel"` | [2–10 catalog product cards](#product-carousel) |
 | `:request_contact_info` | `"request_contact_info"` | [A one-tap "share my number" button](#request-contact-info) |
 
 ## Shared fields
@@ -194,8 +194,9 @@ Whatsapp::Messages::Interactive.new(
 
 ## Media carousel
 
-**2–10** swipeable cards, each with its own header, body, CTA URL, and quick-reply
-buttons. `card_index` is assigned automatically from array position — do not pass it.
+**2–10** swipeable cards. Each card has an image or video header, optional body text,
+and **either** one URL button **or** one or more quick-reply buttons. `card_index` is
+assigned automatically from array position — do not pass it.
 
 ```ruby
 Whatsapp::Messages.send_interactive!(
@@ -208,41 +209,48 @@ Whatsapp::Messages.send_interactive!(
         header: { type: "image", link: "https://example.com/1.jpg" },
         body: "Item one",
         action: { name: "cta_url", display_text: "Buy", url: "https://example.com/1" },
-        buttons: [{ quick_reply: { id: "q1", title: "Details" } }],
       },
       {
         header: { type: "image", link: "https://example.com/2.jpg" },
         body: "Item two",
         action: { name: "cta_url", display_text: "Buy", url: "https://example.com/2" },
-        buttons: [{ quick_reply: { id: "q2", title: "Details" } }],
       },
     ],
   }
 )
+# card => { card_index: 0, type: "cta_url",
+#           header: { type: "image", image: { link: "https://example.com/1.jpg" } },
+#           body: { text: "Item one" },
+#           action: { name: "cta_url", parameters: { display_text: "Buy", url: "https://example.com/1" } } }
+```
+
+For quick-reply cards, pass `buttons:` instead of `action:`. They are sent inside the
+card's `action`, as Meta requires:
+
+```ruby
+{ header: { type: "image", link: "https://example.com/1.jpg" },
+  buttons: [{ quick_reply: { id: "details-1", title: "Details" } }] }
+# card => { ..., action: { buttons: [{ type: "quick_reply", quick_reply: { id: "details-1", title: "Details" } }] } }
 ```
 
 | Field | Rules |
 | --- | --- |
-| `cards` | **2–10** cards |
-| `cards[].header` | Required — same shape as the message header (`link:` only for media) |
-| `cards[].body` | Required |
-| `cards[].action` | Required — a CTA URL action |
-| `cards[].buttons` | Required — array of `{ quick_reply: { id:, title: } }` |
+| `cards` | **2–10** cards, all with the **same button type and count** |
+| `cards[].header` | Required — `type: "image"` or `"video"` only |
+| `cards[].body` | Optional — max **160** characters and **2** line breaks |
+| `cards[].action` | A URL button (`name:`, `display_text:` max 20, `url:`). Exclusive with `buttons` |
+| `cards[].buttons` | Quick replies, each `{ quick_reply: { id:, title: } }` — `id` max **256**, `title` max **20**. Exclusive with `action` |
 
-All five card keys are required Ruby keywords; omitting one raises `ArgumentError`,
-not a validation error.
+A message-level `header:` or `footer:` is rejected: Meta does not support either on a
+carousel.
 
-> **Two caveats.** The wire value `"carousel"` is flagged in the source as worth
-> re-checking against Meta's docs for your API version before relying on it in
-> production. And `MediaCarousel::Card::Button::QuickReply` declares `id`/`title`
-> length validations but never runs `validate!`, so an over-long or blank
-> `id`/`title` serializes silently and is rejected by Meta instead of locally.
+Source: [Interactive media carousel messages](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-media-carousel-messages)
 
 ---
 
 ## Product carousel
 
-**2–10** cards referencing products in your Meta catalog. Like the media carousel,
+**2–10** cards referencing products in **one** Meta catalog. Like the media carousel,
 `card_index` is assigned from array position.
 
 ```ruby
@@ -257,19 +265,19 @@ Whatsapp::Messages.send_interactive!(
     ],
   }
 )
+# card => { type: "product", card_index: 0, action: { catalog_id: "123456789", product_retailer_id: "SKU-1" } }
 ```
 
 | Field | Rules |
 | --- | --- |
-| `cards` | **2–10** cards |
-| `cards[].catalog_id` | Required (Ruby keyword) |
-| `cards[].product_retailer_id` | Required (Ruby keyword) |
+| `cards` | **2–10** cards, all with the **same** `catalog_id` |
+| `cards[].catalog_id` | Required |
+| `cards[].product_retailer_id` | Required |
 
-Card contents carry **no validations at all** — a wrong catalog or SKU surfaces
-server-side.
+A message-level `header:` or `footer:` is rejected, as Meta requires. Whether the
+catalog or SKU exists is only known to Meta, so it surfaces server-side.
 
-> The wire value `"product_list"` carries the same "verify against your API version"
-> caveat as the media carousel.
+Source: [Interactive product carousel messages](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-product-carousel-messages)
 
 ---
 

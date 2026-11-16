@@ -4,6 +4,8 @@ module Whatsapp
   class Messages
     include ResponseHandling
     extend ResponseHandling
+    include Transport
+    extend Transport
 
     # Maps a public message kind to its implementing class. Resolution goes
     # through this frozen whitelist (never `const_get` on caller input), so an
@@ -49,7 +51,7 @@ module Whatsapp
         payload = MarkMessageAsRead.new(message_id:)
 
         response = client.connection.post(
-          client.path_for(client.phone_id, "messages"),
+          messages_path(client),
           json: payload.serialize
         )
 
@@ -99,7 +101,7 @@ module Whatsapp
     #   @raise [Whatsapp::RequestError] if the request fails
     def perform_request!
       response = client.connection.post(
-        client.path_for(client.phone_id, "messages"),
+        messages_path(client),
         json: payload.serialize
       )
 

@@ -53,6 +53,13 @@ RSpec.describe Whatsapp::Messages do
 
       expect { message.send! }.to raise_error(Whatsapp::RequestError, /Failed to send message/)
     end
+
+    it "refuses to send without a phone_id instead of posting to a malformed path" do
+      unconfigured = described_class.new(kind: :text, payload: { to: "+1555", body: "hi" },
+        client: Whatsapp::Client.new(phone_id: nil))
+
+      expect { unconfigured.send! }.to raise_error(Whatsapp::RequestError, /phone_id is required for sending messages/)
+    end
   end
 
   describe "generated send_<kind>! class methods" do
@@ -229,6 +236,11 @@ RSpec.describe Whatsapp::Messages do
 
       expect { described_class.mark_message_as_read!(message_id:) }
         .to raise_error(Whatsapp::RequestError, /Failed to mark message as read/)
+    end
+
+    it "refuses to mark as read without a phone_id instead of posting to a malformed path" do
+      expect { described_class.mark_message_as_read!(message_id:, client: Whatsapp::Client.new(phone_id: nil)) }
+        .to raise_error(Whatsapp::RequestError, /phone_id is required for sending messages/)
     end
 
     it "raises ActiveModel::ValidationError for a missing message_id" do
