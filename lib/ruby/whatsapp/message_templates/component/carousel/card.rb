@@ -36,9 +36,14 @@ module Whatsapp
           #   @return [Component::Buttons, nil]
           attr_accessor :buttons
 
+          # @!attribute [r] parameter_format
+          #   @return [String] see {ParameterFormats}.
+          attr_reader :parameter_format
+
           validates :header, presence: true
           validate :validate_header_format
           validate :validate_button_count
+          validate :validate_parameter_formats
 
           # @param header [Hash, Component::Header] The card's media header.
           # @param body [Hash, Component::Body, nil] The card's body.
@@ -63,6 +68,11 @@ module Whatsapp
             [header&.format, !body.nil?, buttons&.api_types]
           end
 
+          # @return [Boolean] Whether the card's header or body text contains a placeholder.
+          def placeholders?
+            [header, body].compact.any?(&:placeholders?)
+          end
+
           # @return [Hash] The serialized card.
           def serialize
             { components: [header, body, buttons].compact.map(&:serialize) }
@@ -76,6 +86,17 @@ module Whatsapp
             return value if value.is_a?(klass)
 
             klass.new(**value, parameter_format: @parameter_format)
+          end
+
+          # @return [void]
+          def validate_parameter_formats
+            { header:, body: }.each do |attribute, component|
+              next if parameter_format_mismatches([component]).empty?
+
+              errors.add(attribute,
+                "was built with parameter_format #{component.parameter_format}, " \
+                  "but the template uses #{parameter_format}")
+            end
           end
 
           # @return [void]

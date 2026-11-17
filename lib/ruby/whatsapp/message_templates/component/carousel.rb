@@ -28,6 +28,7 @@ module Whatsapp
         validates :cards, presence: true,
           length: { minimum: Defaults::MIN_CARDS, maximum: Defaults::MAX_CARDS }
         validate :validate_identical_structure
+        validate :validate_card_parameter_formats
 
         # @param cards [Array<Hash, Carousel::Card>] Between 2 and 10 cards.
         # @param kwargs [Hash] Forwarded to {Base} (`parameter_format`).
@@ -38,6 +39,11 @@ module Whatsapp
           @cards = build_cards(cards)
 
           validate!
+        end
+
+        # @return [Boolean] Whether any card's text contains a placeholder.
+        def placeholders?
+          cards.any?(&:placeholders?)
         end
 
         # @return [Hash] The serialized component.
@@ -52,6 +58,15 @@ module Whatsapp
         def build_cards(list)
           Array(list).map do |card|
             card.is_a?(Card) ? card : Card.new(**card, parameter_format:)
+          end
+        end
+
+        # @return [void]
+        def validate_card_parameter_formats
+          parameter_format_mismatches(cards).each do |card|
+            errors.add(:cards,
+              "contain a card built with parameter_format #{card.parameter_format}, " \
+                "but the template uses #{parameter_format}")
           end
         end
 

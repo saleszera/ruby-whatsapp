@@ -69,6 +69,11 @@ module Whatsapp
           !add_security_recommendation.nil?
         end
 
+        # @return [Boolean] Whether the body text contains a placeholder.
+        def placeholders?
+          Placeholders.count(text).positive?
+        end
+
         # @return [Hash] The serialized component.
         def serialize
           return { type: Defaults::TYPE, add_security_recommendation: } if authentication?

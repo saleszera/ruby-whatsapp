@@ -39,6 +39,15 @@ module Whatsapp
           self.class::Defaults::TYPE
         end
 
+        # Whether this component's payload depends on {#parameter_format}: only text
+        # carrying placeholders gets a format-specific example key. A container that
+        # was built for one format cannot be reused in a template of the other format
+        # when this is true. Overridden by the components that accept placeholders.
+        # @return [Boolean]
+        def placeholders?
+          false
+        end
+
       protected
 
         # Builds an example payload, deferring any shape mismatch to validation.

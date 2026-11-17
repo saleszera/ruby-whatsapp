@@ -1,3 +1,57 @@
+## [0.6.3] - 2026-11-16
+
+### Fixed
+
+- **A media template header no longer accepts a text example.** `MessageTemplates::Component::Header`
+  sent any `example:` through unchecked, so `format: "IMAGE", example: ["Sale"]` serialized as
+  `example: { header_text: ["Sale"] }` with no `header_handle` and was only rejected by Meta. An
+  `IMAGE`/`VIDEO`/`DOCUMENT`/`GIF` header now requires `example` to hold a non-empty
+  `header_handle` and nothing else, and a `LOCATION` header rejects any `example`, since it takes
+  no creation parameters.
+  ([components](https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates/components/))
+- **A pre-built template component can no longer contradict the template's `parameter_format`.**
+  A `Component::Body` built positionally and passed into a `NAMED` template kept its `body_text`
+  example while the template declared `NAMED`, a combination Meta rejects. `ComponentSet`,
+  `Carousel` and `Carousel::Card` now report a pre-built child whose placeholders were built for
+  the other format. Components without placeholders are unaffected.
+- **`Messages::Interactive#valid?` now checks the nested header, body, footer and action.** They
+  were built only inside `serialize`, so `valid?` returned `true` for, say, an empty reply-button
+  title, and the error appeared only when sending. They are now validated on construction through
+  the same code `serialize` runs, and an unknown keyword or a non-Hash part is reported as a
+  validation error instead of escaping as `ArgumentError`/`TypeError`. A `nil` `type:` is a
+  validation error rather than `NoMethodError`.
+- **The media carousel now sends the card shape Meta documents.** Each card required both a URL
+  button `action:` and quick-reply `buttons:`, and sent the buttons beside `action` rather than
+  inside it. A card now takes **either** `action:` (one URL button) **or** `buttons:` (quick
+  replies), serialized as `action: { name: "cta_url", parameters: {...} }` or
+  `action: { buttons: [...] }`; its body is optional (max 160 characters, 2 line breaks); its
+  header must be an image or video; and every card must use the same button type and count.
+  A card that is invalid, or not a Hash, is reported as the carousel's own validation error, so
+  `valid?` returns `false` instead of raising.
+  The carousel quick reply's `validate!` was never called, and its `id` limit was 20 where Meta
+  allows 256; both are fixed.
+  ([media carousel](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-media-carousel-messages))
+- **The product carousel is sent as `interactive.type: "carousel"`,** as Meta requires, not
+  `"product_list"` (the multi-product message). Its cards now validate `catalog_id`,
+  `product_retailer_id` and a `card_index` of 0–9 on construction, rather than only when
+  serialized, and every card must share one catalog. A card that is not a Hash is a validation
+  error rather than `NoMethodError`.
+  ([product carousel](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-product-carousel-messages))
+- **Carousels reject a message-level `header:`/`footer:`,** which Meta does not support on them.
+- **`Messages::Reaction` accepts exactly one emoji.** The check matched `\p{Emoji}` anywhere in
+  the string, and `\p{Emoji}` also covers ASCII digits, `#` and `*`, so `"a1"`, `"#"` and
+  `"hello 👍"` all passed. It now accepts a single grapheme cluster that starts with an emoji
+  pictograph (including skin tones, ZWJ sequences and tag flags), a flag, or a keycap, or `""`
+  to remove a reaction. Non-emoji pictographic symbols such as U+2388 stay rejected.
+  ([reaction messages](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/reaction-messages))
+- **Sending, marking as read, and uploading media without a `phone_id` raise instead of
+  requesting `/v24.0//messages`.** `Messages` and `Media#upload` now go through
+  `Whatsapp::PathBuilding`, like every other ID-scoped feature. `Media#get_url` and `#delete`
+  omit `phone_number_id` when none is configured, since Meta documents it as optional there.
+  ([media](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media))
+- **Setting `Client#api_key=` or `#host=` after the first request takes effect.** The cached
+  connection kept the old bearer token and host; changing either now rebuilds it.
+
 ## [0.6.2] - 2026-10-22
 
 ### Fixed

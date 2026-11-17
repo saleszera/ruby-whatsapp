@@ -5,7 +5,12 @@ module Whatsapp
     class Interactive
       class MediaCarousel
         class Card
+          # A button on a media carousel card. Meta documents only the quick-reply
+          # kind in a card's `action.buttons`; a URL button is the card's `action` itself.
+          # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-media-carousel-messages
           class Button
+            include ActiveModel::Validations
+
             module Defaults
               BUTTON_TYPE = "quick_reply"
             end
@@ -14,9 +19,14 @@ module Whatsapp
             #   @return [Hash]
             attr_accessor :quick_reply
 
-            # @param quick_reply [Hash] The quick reply content of the button.
+            validates :quick_reply, presence: true
+
+            # @param quick_reply [Hash] The quick reply content of the button (`id:`, `title:`).
+            # @raise [ActiveModel::ValidationError] if validation fails.
             def initialize(quick_reply:)
               @quick_reply = quick_reply
+
+              validate!
             end
 
             class << self
@@ -30,14 +40,8 @@ module Whatsapp
             def serialize
               {
                 type: Defaults::BUTTON_TYPE,
-                quick_reply: serialized_quick_reply,
+                quick_reply: QuickReply.serialize(**quick_reply),
               }
-            end
-
-          private
-
-            def serialized_quick_reply
-              QuickReply.serialize(**quick_reply)
             end
           end
         end

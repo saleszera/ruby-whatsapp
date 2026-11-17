@@ -86,6 +86,11 @@ module Whatsapp
           Formats::MEDIA.include?(format)
         end
 
+        # @return [Boolean] Whether the header text contains a placeholder.
+        def placeholders?
+          Placeholders.count(text).positive?
+        end
+
         # @return [Hash] The serialized component.
         def serialize
           {
@@ -165,22 +170,34 @@ module Whatsapp
           errors.add(:text, "cannot contain Markdown characters (found #{found.join(' ')})")
         end
 
+        # A media header's only example is the uploaded asset handle. Sample text
+        # (`header_text`) would otherwise pass through {Example} and reach Meta with no
+        # handle at all.
         # @return [void]
         def validate_media_shape
           return unless media?
 
           reject_unsupported(:text, "cannot be set on a #{format} header")
-          return unless blank_value?(example)
+          return errors.add(:header_handle, "can't be blank for a #{format} header") if blank_value?(example)
+          return errors.add(:example, "must be a header_handle for a #{format} header") unless handle_only_example?
 
-          errors.add(:header_handle, "can't be blank for a #{format} header")
+          errors.add(:header_handle, "can't be blank for a #{format} header") if blank_value?(example[:header_handle])
         end
 
+        # @return [Boolean] Whether {#example} holds a `header_handle` and nothing else.
+        def handle_only_example?
+          example.is_a?(Hash) && example.keys == [:header_handle]
+        end
+
+        # A location header takes no creation parameters; its coordinates are supplied
+        # when the message is sent.
         # @return [void]
         def validate_location_shape
           return unless format == Formats::LOCATION
 
           reject_unsupported(:text, "cannot be set on a #{Formats::LOCATION} header")
           reject_unsupported(:header_handle, "cannot be set on a #{Formats::LOCATION} header")
+          reject_unsupported(:example, "cannot be set on a #{Formats::LOCATION} header")
         end
       end
     end

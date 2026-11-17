@@ -9,16 +9,18 @@ module Whatsapp
     SEGMENT_UNRESERVED = /[^A-Za-z0-9\-._~]/
 
     # @!attribute [rw] host
-    # @return [String]
-    attr_accessor :host
+    #   Changing it rebuilds {#connection}, which is bound to the host.
+    #   @return [String]
+    attr_reader :host
 
     # @!attribute [rw] version
     # @return [String]
     attr_accessor :version
 
     # @!attribute [rw] api_key
-    # @return [String]
-    attr_accessor :api_key
+    #   Changing it rebuilds {#connection}, which carries the bearer token.
+    #   @return [String]
+    attr_reader :api_key
 
     # @!attribute [rw] phone_id
     # @return [String]
@@ -53,6 +55,20 @@ module Whatsapp
       @waba_id = waba_id
       @timeout = timeout
       @logger = logger
+    end
+
+    # @param value [String]
+    # @return [String]
+    def host=(value)
+      reset_connection
+      @host = value
+    end
+
+    # @param value [String, nil]
+    # @return [String, nil]
+    def api_key=(value)
+      reset_connection
+      @api_key = value
     end
 
     # Sets up and returns the persistent HTTP client, authenticated and instrumented.
@@ -92,6 +108,14 @@ module Whatsapp
     end
 
   private
+
+    # Drops the memoized connection so the next request builds one from the current
+    # settings, closing the old persistent socket rather than leaving it to GC.
+    # @return [void]
+    def reset_connection
+      @connection&.close
+      @connection = nil
+    end
 
     # Percent-encodes one path segment, byte-wise so multibyte input is handled correctly.
     # @param segment [#to_s] The segment to encode.

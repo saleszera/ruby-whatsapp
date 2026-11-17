@@ -99,6 +99,23 @@ RSpec.describe Whatsapp::MessageTemplates::Component::Header do
       expect { described_class.new(format: "IMAGE", header_handle: "4::aW", text: "Hi") }
         .to raise_error(ActiveModel::ValidationError, /cannot be set/)
     end
+
+    # A media header's example is the uploaded asset handle, never sample text.
+    # See https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates/components/#media-headers
+    it "rejects a text example in place of a header_handle" do
+      expect { described_class.new(format: "IMAGE", example: ["Sale"]) }
+        .to raise_error(ActiveModel::ValidationError, /Example must be a header_handle for a IMAGE header/)
+    end
+
+    it "rejects a pre-built example payload that carries anything besides header_handle" do
+      expect { described_class.new(format: "VIDEO", example: { header_handle: ["4::aW"], header_text: ["x"] }) }
+        .to raise_error(ActiveModel::ValidationError, /Example must be a header_handle for a VIDEO header/)
+    end
+
+    it "rejects an empty header_handle list" do
+      expect { described_class.new(format: "DOCUMENT", example: { header_handle: [] }) }
+        .to raise_error(ActiveModel::ValidationError, /Header handle can't be blank/)
+    end
   end
 
   describe "a location header" do
@@ -114,6 +131,13 @@ RSpec.describe Whatsapp::MessageTemplates::Component::Header do
     it "rejects a header_handle" do
       expect { described_class.new(format: "LOCATION", header_handle: "4::aW") }
         .to raise_error(ActiveModel::ValidationError, /cannot be set/)
+    end
+
+    # A location header takes no creation parameters at all.
+    # See https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates/components/#location-headers
+    it "rejects an example" do
+      expect { described_class.new(format: "LOCATION", example: ["x"]) }
+        .to raise_error(ActiveModel::ValidationError, /Example cannot be set on a LOCATION header/)
     end
   end
 

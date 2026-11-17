@@ -11,14 +11,15 @@ module Whatsapp
       # `interactive.type` value emitted in the payload. Resolution goes through
       # this frozen whitelist — never `const_get` on caller input.
       #
-      # NOTE: the carousel `api_type` values ("carousel"/"product_list") should be
-      # verified against the Meta docs for your API version before relying on them.
+      # Both carousels share the wire type "carousel" and are distinguished by their
+      # cards. `body_only` marks the kinds Meta forbids a message-level header and
+      # footer on; see #validate_body_only.
       ACTION_TYPES = {
         reply_buttons: { klass: ReplyButtons, api_type: "button" },
         list_buttons: { klass: ListButtons, api_type: "list" },
         url_button: { klass: UrlButton, api_type: "cta_url" },
-        media_carousel: { klass: MediaCarousel, api_type: "carousel" },
-        product_carousel: { klass: ProductCarousel, api_type: "product_list" },
+        media_carousel: { klass: MediaCarousel, api_type: "carousel", body_only: true },
+        product_carousel: { klass: ProductCarousel, api_type: "carousel", body_only: true },
         # The one kind whose registry key and wire value coincide — the registry exists
         # because they usually differ, so this is not a copy-paste slip. `parameterless`
         # marks the one kind with nothing for a caller to supply; see #validate_action.
@@ -45,9 +46,17 @@ module Whatsapp
       #   @return [Hash]
       attr_accessor :action
 
+      # What building a nested part from caller input can raise: its own validation
+      # failure, an unknown or missing keyword (ArgumentError), a non-Hash where a Hash
+      # is expected (TypeError), or an incomplete header. Each is reported as a
+      # validation error on the part, so one kind of mistake has one exception type.
+      PART_ERRORS = [ActiveModel::ValidationError, ArgumentError, TypeError, Header::HeaderError].freeze
+
       validates :type, presence: true, inclusion: { in: ACTION_TYPES.keys }
       validates :body, presence: true
       validate :validate_action
+      validate :validate_body_only
+      validate :validate_parts
 
       # @param type [Symbol, String] The action kind (see {ACTION_TYPES}).
       # @param body [String] The body text of the interactive message.
@@ -60,13 +69,23 @@ module Whatsapp
       def initialize(type:, body:, action: {}, header: nil, footer: nil, **)
         super(**)
 
-        @type = type.to_sym
+        @type = type&.to_sym
         @body = body
         @action = action
         @header = header
         @footer = footer
 
         validate!
+      end
+
+      # Describes what building a nested part or card raised, for reporting it as a
+      # validation error on the object that holds it. Shared with {CarouselCards}.
+      # @param error [StandardError]
+      # @return [String]
+      def self.nested_error_message(error)
+        return error.model.errors.full_messages.join(", ") if error.is_a?(ActiveModel::ValidationError)
+
+        error.message
       end
 
       # @return [Hash] Serialized representation of the Interactive message.
@@ -78,13 +97,39 @@ module Whatsapp
 
       # @return [Hash] The serialized `interactive` payload.
       def interactive_payload
+        { type: action_config[:api_type], **part_builders.transform_values(&:call) }
+      end
+
+      # How to serialize each part that is present, in payload order. Shared by
+      # {#interactive_payload} and {#validate_parts}, so validation exercises exactly
+      # the code that serialization will run.
+      # @return [Hash{Symbol => Proc}]
+      def part_builders
         {
-          type: action_config[:api_type],
-          header: serialized_header,
-          body: serialized_body,
-          footer: serialized_footer,
-          action: action_config[:klass].serialize(**action),
-        }.compact
+          header: header && -> { Header.serialize(**header) },
+          body: body.present? && -> { Body.serialize(body) },
+          footer: footer && -> { Footer.serialize(**footer) },
+          action: action_buildable? && -> { action_config[:klass].serialize(**action) },
+        }.select { |_part, builder| builder }
+      end
+
+      # Whether the action can be built at all; an unknown type or a missing action is
+      # already reported by the inclusion validator and {#validate_action}.
+      # @return [Boolean]
+      def action_buildable?
+        config = ACTION_TYPES[type]
+        !config.nil? && (config[:parameterless] || action.present?)
+      end
+
+      # Builds every present part, recording whatever building one raises as an error on
+      # that part, so `valid?` is true only when {#serialize} will succeed.
+      # @return [void]
+      def validate_parts
+        part_builders.each do |part, builder|
+          builder.call
+        rescue *PART_ERRORS => e
+          errors.add(part, :invalid, message: "is invalid: #{self.class.nested_error_message(e)}")
+        end
       end
 
       # @return [Hash] The registry entry for the current action kind.
@@ -105,25 +150,15 @@ module Whatsapp
         errors.add(:action, "can't be blank")
       end
 
-      # @return [Hash, nil] The serialized header information.
-      def serialized_header
-        return unless header
+      # Carousels carry their media on the cards, so Meta rejects a message-level
+      # header or footer on them.
+      # @return [void]
+      def validate_body_only
+        return unless ACTION_TYPES.dig(type, :body_only)
 
-        Header.serialize(**header)
-      end
-
-      # @return [Hash, nil] The serialized footer information.
-      def serialized_footer
-        return unless footer
-
-        Footer.serialize(**footer)
-      end
-
-      # @return [Hash, nil] The serialized body information.
-      def serialized_body
-        return unless body
-
-        Body.serialize(body)
+        { header:, footer: }.each do |part, value|
+          errors.add(part, "is not supported on a #{type} message") unless value.nil?
+        end
       end
     end
   end

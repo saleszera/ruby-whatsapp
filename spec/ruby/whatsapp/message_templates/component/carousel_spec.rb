@@ -27,6 +27,17 @@ RSpec.describe Whatsapp::MessageTemplates::Component::Carousel do
 
       expect(described_class.new(cards: [built, built]).serialize[:cards].size).to eq(2)
     end
+
+    # See https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates/components/#named-parameters
+    it "rejects already-built cards whose placeholders use a different parameter format" do
+      built = Whatsapp::MessageTemplates::Component::Carousel::Card.new(
+        **card, body: { text: "Rare {{1}} in stock!", example: ["Tulips"] }
+      )
+
+      expect { described_class.new(cards: [built, built], parameter_format: :named) }
+        .to raise_error(ActiveModel::ValidationError,
+          /Cards contain a card built with parameter_format POSITIONAL, but the template uses NAMED/)
+    end
   end
 
   describe "card count validations" do

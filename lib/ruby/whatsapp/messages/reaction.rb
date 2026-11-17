@@ -9,6 +9,21 @@ module Whatsapp
         TYPE = "reaction"
       end
 
+      # Exactly one user-perceived character (grapheme cluster) that is an emoji: a cluster
+      # starting with an emoji pictograph (which covers skin tones, ZWJ sequences, variation
+      # selectors and tag flags), a regional-indicator flag pair, or a keycap. Neither
+      # property is enough alone: `\p{Emoji}` also matches the ASCII digits, `#` and `*`, and
+      # `\p{Extended_Pictographic}` also matches non-emoji symbols and code points Unicode
+      # reserves for future emoji, such as U+2388 and U+1F000.
+      EMOJI_PATTERN = /
+        \A(?=\X\z)                                  # exactly one grapheme cluster
+        (?:
+          [\p{Emoji}&&\p{Extended_Pictographic}].*  # an emoji pictograph and its modifiers
+          | \p{Regional_Indicator}{2}               # a flag
+          | [0-9\#*]\uFE0F?\u20E3                   # a keycap
+        )\z
+      /xm
+
       # @!attribute [rw] message_id
       #   @return [String]
       attr_accessor :message_id
@@ -18,7 +33,7 @@ module Whatsapp
       attr_accessor :emoji
 
       validates :message_id, presence: true
-      validate :emoji_unicode
+      validate :validate_emoji
 
       # @param message_id [String] The ID of the message being reacted to.
       # @param emoji [String] The emoji used for the reaction.
@@ -41,20 +56,15 @@ module Whatsapp
 
     private
 
-      # Validates that the emoji is a valid Unicode emoji character.
+      # An empty string is allowed, to remove a previously sent reaction. (Meta's
+      # reaction page does not currently describe removal; this keeps the behavior the
+      # gem has always documented.)
       # @return [void]
-      # @raise [ActiveModel::ValidationError] if the emoji is not valid.
-      def emoji_unicode
-        if @emoji.nil?
-          errors.add(:emoji, "can't be nil")
-          return
-        end
+      def validate_emoji
+        return errors.add(:emoji, :blank, message: "can't be nil") if emoji.nil?
+        return if emoji.empty? || emoji.match?(EMOJI_PATTERN)
 
-        # An empty string is valid: it removes a previously sent reaction.
-        return if @emoji.empty?
-        return if @emoji.match?(/\p{Emoji}/)
-
-        errors.add(:emoji, "must be a valid emoji character")
+        errors.add(:emoji, :invalid, message: "must be a single emoji")
       end
     end
   end

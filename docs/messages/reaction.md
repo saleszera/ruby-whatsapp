@@ -15,8 +15,10 @@ Whatsapp::Messages.send_reaction!(to: "+15551234567", message_id: "wamid.HBg..."
 | `message_id` | yes | The WAMID of the message being reacted to |
 | `emoji` | yes | A single emoji, or `""` to remove |
 
-`emoji` is checked against Ruby's `\p{Emoji}` property, so a plain word is rejected
-locally rather than by Meta. `nil` is invalid; the empty string is not.
+`emoji` must be exactly one emoji: a single user-perceived character such as `"👍"`,
+`"👍🏽"`, `"👨‍👩‍👧"`, `"🇧🇷"` or `"1️⃣"`. Text, two emoji, a bare digit or `#`, and
+non-emoji symbols are rejected locally rather than by Meta. `nil` is invalid; the empty
+string is not.
 
 ## Removing a reaction
 
