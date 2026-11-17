@@ -9,11 +9,20 @@ module Whatsapp
         TYPE = "reaction"
       end
 
-      # Exactly one user-perceived character (grapheme cluster) that is an emoji: any
-      # cluster containing a pictographic code point (which covers skin tones, ZWJ
-      # sequences and variation selectors), a regional-indicator flag pair, or a keycap.
-      # `\p{Emoji}` alone is not enough — it also matches the ASCII digits, `#` and `*`.
-      EMOJI_PATTERN = /\A(?=\X\z)(?:.*\p{Extended_Pictographic}.*|\p{Regional_Indicator}{2}|[0-9#*]\uFE0F?\u20E3)\z/m
+      # Exactly one user-perceived character (grapheme cluster) that is an emoji: a cluster
+      # starting with an emoji pictograph (which covers skin tones, ZWJ sequences, variation
+      # selectors and tag flags), a regional-indicator flag pair, or a keycap. Neither
+      # property is enough alone: `\p{Emoji}` also matches the ASCII digits, `#` and `*`, and
+      # `\p{Extended_Pictographic}` also matches non-emoji symbols and code points Unicode
+      # reserves for future emoji, such as U+2388 and U+1F000.
+      EMOJI_PATTERN = /
+        \A(?=\X\z)                                  # exactly one grapheme cluster
+        (?:
+          [\p{Emoji}&&\p{Extended_Pictographic}].*  # an emoji pictograph and its modifiers
+          | \p{Regional_Indicator}{2}               # a flag
+          | [0-9\#*]\uFE0F?\u20E3                   # a keycap
+        )\z
+      /xm
 
       # @!attribute [rw] message_id
       #   @return [String]

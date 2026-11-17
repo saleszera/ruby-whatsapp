@@ -29,6 +29,39 @@ RSpec.describe Whatsapp::Messages::Interactive::ProductCarousel do
       expect { described_class.new(cards: [card, card.merge(catalog_id: "987654321")]) }
         .to raise_error(ActiveModel::ValidationError, /Cards must all use the same catalog_id/)
     end
+
+    it "validates each card on construction, as the carousel's own error" do
+      expect { described_class.new(cards: [card, card.merge(product_retailer_id: "")]) }
+        .to raise_error(ActiveModel::ValidationError) { |error|
+          expect(error.model).to be_a(described_class)
+          expect(error.message).to match(/Cards contain an invalid card at index 1: Product retailer can't be blank/)
+        }
+    end
+
+    it "reports a card missing a key instead of raising ArgumentError" do
+      expect { described_class.new(cards: [card, card.except(:product_retailer_id)]) }
+        .to raise_error(ActiveModel::ValidationError, /Cards contain an invalid card at index 1/)
+    end
+
+    it "reports cards that are not Hashes instead of raising NoMethodError" do
+      expect { described_class.new(cards: [nil, nil]) }
+        .to raise_error(ActiveModel::ValidationError, /index 0.*index 1/)
+    end
+
+    it "returns false from valid? when a card has become invalid, rather than raising" do
+      carousel = described_class.new(cards: [card, card])
+      carousel.cards = [card, nil]
+
+      expect(carousel.valid?).to be(false)
+      expect(carousel.errors[:cards]).to include(/invalid card at index 1/)
+    end
+
+    it "keeps a malformed card a validation error through Interactive" do
+      expect do
+        Whatsapp::Messages::Interactive.new(to: "+1", type: :product_carousel, body: "Pick one",
+          action: { cards: [nil, nil] })
+      end.to raise_error(ActiveModel::ValidationError, /Action is invalid/)
+    end
   end
 
   describe Whatsapp::Messages::Interactive::ProductCarousel::Card do

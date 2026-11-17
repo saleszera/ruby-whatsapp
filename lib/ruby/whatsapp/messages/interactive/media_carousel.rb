@@ -7,6 +7,8 @@ module Whatsapp
       # each card's position, so callers never pass it.
       # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-media-carousel-messages
       class MediaCarousel < Base
+        include CarouselCards
+
         module Defaults
           MIN_CARDS_LENGTH = 2
           MAX_CARDS_LENGTH = 10
@@ -18,7 +20,7 @@ module Whatsapp
 
         validates :cards, presence: true, length: { minimum: Defaults::MIN_CARDS_LENGTH,
                                                     maximum: Defaults::MAX_CARDS_LENGTH, }
-        validate :validate_identical_buttons
+        validate :validate_cards
 
         # @param cards [Array<Hash>] The media cards (see {Card#initialize}, without `card_index`).
         # @raise [ActiveModel::ValidationError] if validation fails, including a card's own.
@@ -55,11 +57,13 @@ module Whatsapp
           Array(cards).map.with_index { |card, index| Card.new(card_index: index, **card) }
         end
 
-        # Meta: "button types and counts must match across all cards".
+        # Reports each invalid card, then Meta's cross-card rule: "button types and counts
+        # must match across all cards".
         # @return [void]
-        def validate_identical_buttons
-          return if Array(cards).size < Defaults::MIN_CARDS_LENGTH
-          return if built_cards.map(&:signature).uniq.size == 1
+        def validate_cards
+          built = build_cards(Card)
+          return if built.nil? || built.size < Defaults::MIN_CARDS_LENGTH
+          return if built.map(&:signature).uniq.size == 1
 
           errors.add(:cards, "must all use the same button type and count")
         end

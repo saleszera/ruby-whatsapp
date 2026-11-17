@@ -33,6 +33,8 @@ RSpec.describe Whatsapp::Messages::Reaction do
         ["a keycap", "1️⃣"],
         ["a variation-selected symbol", "❤️"],
         ["the escape-sequence form", "\u{1F600}"],
+        ["a text-default symbol with its emoji variation selector", "\u00A9\uFE0F"],
+        ["a subdivision flag tag sequence", "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}"],
       ].each do |label, emoji|
         it "accepts #{label}" do
           expect { described_class.new(to:, message_id:, emoji:) }.not_to raise_error
@@ -46,6 +48,11 @@ RSpec.describe Whatsapp::Messages::Reaction do
         ["a bare digit", "1"],
         ["a bare #", "#"],
         ["plain text", "ok"],
+        # Extended_Pictographic also covers symbols that are not emoji, and code points Unicode
+        # reserves for future emoji; neither has the Emoji property.
+        ["a pictographic symbol that is not an emoji", "\u2388"],
+        ["a pictographic code point that is not an emoji", "\u{1F000}"],
+        ["a non-emoji symbol joined to an emoji", "\u2388\u200D\u{1F44D}"],
       ].each do |label, emoji|
         it "rejects #{label}" do
           expect { described_class.new(to:, message_id:, emoji:) }

@@ -78,6 +78,16 @@ module Whatsapp
         validate!
       end
 
+      # Describes what building a nested part or card raised, for reporting it as a
+      # validation error on the object that holds it. Shared with {CarouselCards}.
+      # @param error [StandardError]
+      # @return [String]
+      def self.nested_error_message(error)
+        return error.model.errors.full_messages.join(", ") if error.is_a?(ActiveModel::ValidationError)
+
+        error.message
+      end
+
       # @return [Hash] Serialized representation of the Interactive message.
       def serialize
         envelope(type: Defaults::TYPE, interactive: interactive_payload)
@@ -118,16 +128,8 @@ module Whatsapp
         part_builders.each do |part, builder|
           builder.call
         rescue *PART_ERRORS => e
-          errors.add(part, :invalid, message: "is invalid: #{part_error_message(e)}")
+          errors.add(part, :invalid, message: "is invalid: #{self.class.nested_error_message(e)}")
         end
-      end
-
-      # @param error [StandardError]
-      # @return [String]
-      def part_error_message(error)
-        return error.model.errors.full_messages.join(", ") if error.is_a?(ActiveModel::ValidationError)
-
-        error.message
       end
 
       # @return [Hash] The registry entry for the current action kind.

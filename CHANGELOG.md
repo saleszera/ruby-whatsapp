@@ -26,18 +26,23 @@
   replies), serialized as `action: { name: "cta_url", parameters: {...} }` or
   `action: { buttons: [...] }`; its body is optional (max 160 characters, 2 line breaks); its
   header must be an image or video; and every card must use the same button type and count.
+  A card that is invalid, or not a Hash, is reported as the carousel's own validation error, so
+  `valid?` returns `false` instead of raising.
   The carousel quick reply's `validate!` was never called, and its `id` limit was 20 where Meta
   allows 256; both are fixed.
   ([media carousel](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-media-carousel-messages))
 - **The product carousel is sent as `interactive.type: "carousel"`,** as Meta requires, not
   `"product_list"` (the multi-product message). Its cards now validate `catalog_id`,
-  `product_retailer_id` and a `card_index` of 0–9, and every card must share one catalog.
+  `product_retailer_id` and a `card_index` of 0–9 on construction, rather than only when
+  serialized, and every card must share one catalog. A card that is not a Hash is a validation
+  error rather than `NoMethodError`.
   ([product carousel](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-product-carousel-messages))
 - **Carousels reject a message-level `header:`/`footer:`,** which Meta does not support on them.
 - **`Messages::Reaction` accepts exactly one emoji.** The check matched `\p{Emoji}` anywhere in
   the string, and `\p{Emoji}` also covers ASCII digits, `#` and `*`, so `"a1"`, `"#"` and
-  `"hello 👍"` all passed. It now accepts a single grapheme cluster that is an emoji (including
-  skin tones, ZWJ sequences, flags and keycaps), or `""` to remove a reaction.
+  `"hello 👍"` all passed. It now accepts a single grapheme cluster that starts with an emoji
+  pictograph (including skin tones, ZWJ sequences and tag flags), a flag, or a keycap, or `""`
+  to remove a reaction. Non-emoji pictographic symbols such as U+2388 stay rejected.
   ([reaction messages](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/reaction-messages))
 - **Sending, marking as read, and uploading media without a `phone_id` raise instead of
   requesting `/v24.0//messages`.** `Messages` and `Media#upload` now go through

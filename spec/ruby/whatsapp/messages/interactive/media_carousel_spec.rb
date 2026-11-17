@@ -58,6 +58,28 @@ RSpec.describe Whatsapp::Messages::Interactive::MediaCarousel do
       expect { described_class.new(cards: [quick_reply_card, two_replies]) }
         .to raise_error(ActiveModel::ValidationError, /Cards must all use the same button type and count/)
     end
+
+    it "reports an invalid card as the carousel's own error" do
+      bad_card = url_card.merge(header: { type: "text", text: "Hi" })
+
+      expect { described_class.new(cards: [url_card, bad_card]) }.to raise_error(ActiveModel::ValidationError) { |error|
+        expect(error.model).to be_a(described_class)
+        expect(error.message).to match(/Cards contain an invalid card at index 1: Header must be an image or video/)
+      }
+    end
+
+    it "reports a card that is not a Hash instead of raising" do
+      expect { described_class.new(cards: [url_card, nil]) }
+        .to raise_error(ActiveModel::ValidationError, /Cards contain an invalid card at index 1/)
+    end
+
+    it "returns false from valid? when a card has become invalid, rather than raising" do
+      carousel = described_class.new(cards: [url_card, url_card])
+      carousel.cards = [url_card, url_card.merge(header: { type: "text", text: "Hi" })]
+
+      expect(carousel.valid?).to be(false)
+      expect(carousel.errors[:cards]).to include(/invalid card at index 1/)
+    end
   end
 
   describe Whatsapp::Messages::Interactive::MediaCarousel::Card do

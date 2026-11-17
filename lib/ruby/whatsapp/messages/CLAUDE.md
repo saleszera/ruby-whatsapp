@@ -278,6 +278,8 @@ Whatsapp::Messages::Interactive.new(
 
 Both carousels are `body_only`: Meta rejects a message-level `header`/`footer` on them, so `#validate_body_only` does too.
 
+Both carousels include `Interactive::CarouselCards`, whose `build_cards` builds every card during validation and reports one that raises (its own `ValidationError`, a missing keyword, a non-Hash) on the carousel's `:cards`. The cross-card rule (same button type and count; same catalog) runs on the built cards only once all of them build, so `valid?` never raises. `Interactive.nested_error_message` phrases those errors for both this and `#validate_parts`.
+
 **Nested parts are validated on construction.** `#validate_parts` runs the same `part_builders` that `#interactive_payload` serializes with, and reports anything they raise (a nested `ValidationError`, an unknown keyword, a non-Hash, an incomplete header) as an error on that part. So `valid?` is true only when `serialize` will succeed.
 
 ### Mark Message As Read (`mark_message_as_read.rb`)
