@@ -26,11 +26,17 @@ module Whatsapp
   # user's phone number in your webhooks after they adopt a username. Also a `phone_id`
   # edge, though what it affects is scoped to the whole business portfolio.
   #
+  # {ConversationalAutomation} reads and configures the in-chat helpers a user meets on
+  # opening a chat: ice breakers, `/commands`, and the welcome-message switch. A `phone_id`
+  # edge for the write and a field on the phone number node for the read, so it uses both
+  # of {Transport}'s methods.
+  #
   # {Account} is the one exception to the `phone_id` rule: it reads and updates the
   # WhatsApp Business Account a number belongs to, so it addresses `waba_id` and
   # carries its own transport.
   # See `lib/ruby/whatsapp/business_phone_number/CLAUDE.md`,
-  # `docs/business_phone_number/README.md`, and `docs/business_phone_number/profile.md`.
+  # `docs/business_phone_number/README.md`, `docs/business_phone_number/profile.md`, and
+  # `docs/business_phone_number/conversational_automation.md`.
   # Source: https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/registration
   module BusinessPhoneNumber
     class Error < Whatsapp::Error; end
