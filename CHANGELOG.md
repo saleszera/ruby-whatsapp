@@ -1,3 +1,27 @@
+## [Unreleased]
+
+### Added
+
+- **`Whatsapp::BusinessPhoneNumber::ConversationalAutomation`**: `Get` and `Update` read and
+  configure a phone number's conversational components, which are its ice breakers
+  (`prompts`), `/commands`, and the `enable_welcome_message` switch (#29).
+  - **Endpoints.** `Update` posts to `/{phone_id}/conversational_automation`. `Get` reads the
+    `conversational_automation` field on the phone number node
+    (`GET /{phone_id}?fields=conversational_automation`), the only read form current docs show.
+  - **Clearing settings.** Meta documents no `DELETE`. Omitted fields are left out of the
+    payload, and `false` / `[]` are sent through, which is how settings are cleared.
+  - **Validation.** Every documented limit is checked before the request: at most 4 prompts
+    of 80 characters, at most 30 commands, `command_name` up to 32 and
+    `command_description` up to 256 characters, unique command names, no leading `/`, and
+    no emoji. The emoji check lets text symbols such as `©` and `™` through.
+  - **Bad command entries.** A malformed command is reported as a `:commands` validation
+    error naming its index, rather than raising.
+  - **Round trip.** `Details#commands` keeps Meta's raw hashes, and `Update` accepts them
+    back, so reading, appending, and writing works.
+  ([conversational automation](https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-account/conversational-automation-api))
+- **`BusinessPhoneNumber::Transport#node_path`** addresses the phone number node itself
+  (no edge segment), alongside the existing `edge_path`.
+
 ## [0.6.3] - 2026-11-16
 
 ### Fixed
