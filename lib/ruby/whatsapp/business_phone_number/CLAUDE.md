@@ -20,7 +20,7 @@ RequestCode  ->  VerifyCode  ->  Register            (onboarding)
 Deregister                                            (the reverse switch)
 ```
 
-Alongside that flow, four sub-namespaces describe things *about* the number rather than its
+Alongside that flow, five sub-namespaces describe things *about* the number rather than its
 onboarding state:
 
 - `Profile` reads and updates the business profile a WhatsApp user sees — the public card:
@@ -32,10 +32,13 @@ onboarding state:
 - `ContactBook` deletes a stored user contact — the store Meta uses to keep putting a user's
   phone number in your webhooks after they adopt a username. Addresses `phone_id`, though
   what it affects is scoped to the whole business portfolio.
+- `ConversationalAutomation` reads and configures the in-chat helpers a user meets on
+  opening a chat: ice breakers (`prompts`), `/commands`, and the welcome-message switch.
+  Addresses `phone_id`, and is the first caller of `Transport#node_path`.
 - `Account` reads and updates the WhatsApp Business Account the number belongs to — the one
   part of this directory that addresses `waba_id` rather than `phone_id`.
 
-See "Why `Account` and `Profile` live here" below, which now covers four sub-namespaces.
+See "Why `Account` and `Profile` live here" below, which now covers five sub-namespaces.
 
 Source:
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/registration
@@ -44,6 +47,8 @@ Source:
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/verify-code-api
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-account/whatsapp-business-account-api
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/whatsapp-business-profile-api
+- https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-account/conversational-automation-api
+- https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/conversational-components
 
 Full API research and design rationale: see the Meta docs links above.
 
@@ -76,7 +81,8 @@ module follows that shape, but diverges in two places where the actual API diffe
 
 ```
 BusinessPhoneNumber              module doc + Error (Whatsapp::BusinessPhoneNumber::Error)
-  ├── Transport                  shared: edge_path(client, action); guard via Whatsapp::PathBuilding
+  ├── Transport                  shared: edge_path(client, action) + node_path(client), both phone_id;
+  │                              guard via Whatsapp::PathBuilding
   ├── RequestCode                POST /{phone_id}/request_code -> Response
   ├── VerifyCode                 POST /{phone_id}/verify_code  -> Response
   ├── Register                   POST /{phone_id}/register     -> Response
@@ -98,6 +104,14 @@ BusinessPhoneNumber              module doc + Error (Whatsapp::BusinessPhoneNumb
   ├── ContactBook                stored user contacts — phone_id, via the SAME Transport
   │     ├── Delete               DELETE /{phone_id}/contact_book -> ContactBook::Deletion
   │     └── Deletion             messaging_product, success, deleted
+  ├── ConversationalAutomation   ice breakers, /commands, welcome message — phone_id, SAME Transport
+  │     ├── Get                  GET  /{phone_id}?fields=conversational_automation -> Details
+  │     │                        (a field on the node: Transport#node_path)
+  │     ├── Update               POST /{phone_id}/conversational_automation -> Response (reused)
+  │     ├── Command              write-side value object: command_name, command_description
+  │     ├── Details              id, enable_welcome_message, prompts, commands (raw hashes);
+  │     │                        owns the {conversational_automation: {...}} envelope
+  │     └── Limits               documented counts/lengths + emoji?, shared by Update and Command
   └── Account                    the WABA node — waba_id, not phone_id
         ├── Transport            node_path(client), waba_id, NO edge segment
         ├── Get                  GET  /{waba_id}  -> Account::Details
@@ -106,18 +120,21 @@ BusinessPhoneNumber              module doc + Error (Whatsapp::BusinessPhoneNumb
 ```
 
 `Transport` is `extend`ed (not `include`d) by all four onboarding action classes **and by
-every action under `Profile`, `Username`, and `ContactBook`**, mirroring
-`SubscribedApp::Transport`. Addresses `client.phone_id`, like `Media` and `Messages`. There
-are still only two transports in this directory, three sub-namespaces later — each of those
-endpoints is a phone-number-scoped *edge*, which is exactly what `edge_path` already builds.
+every action under `Profile`, `Username`, `ContactBook`, and `ConversationalAutomation`**,
+mirroring `SubscribedApp::Transport`. Addresses `client.phone_id`, like `Media` and
+`Messages`. There are still only two transports in this directory, four sub-namespaces
+later. Every endpoint but one is a phone-number-scoped *edge*, which is exactly what
+`edge_path` builds. The exception, `ConversationalAutomation::Get`, reads a field on the
+phone number *node*, and `Transport#node_path` covers it. That is a second method on the
+same transport, not a third transport, because the ID is the same.
 `Username` is the proof that taking the edge as an argument was right: it is the first
 sub-namespace with two of them. Both transports `include`
 `Whatsapp::PathBuilding` (`../path_building.rb`), the gem-wide mixin owning the guard and
 its wording.
 
-## Why `Account`, `Profile`, `Username`, and `ContactBook` live here
+## Why `Account`, `Profile`, `Username`, `ContactBook`, and `ConversationalAutomation` live here
 
-All four describe something *about* a phone number rather than its onboarding state, which is why they sit here. They are **not** all the same kind of case, and the difference is worth keeping straight:
+All five describe something *about* a phone number rather than its onboarding state, which is why they sit here. They are **not** all the same kind of case, and the difference is worth keeping straight:
 
 | | Addresses | Own transport? |
 |---|---|---|
@@ -125,6 +142,7 @@ All four describe something *about* a phone number rather than its onboarding st
 | `Profile` | `phone_id` + edge | **no** — reuses the very same `edge_path` |
 | `Username` | `phone_id` + **two** edges | **no** — same `edge_path`, called with each edge |
 | `ContactBook` | `phone_id` + edge | **no** — same `edge_path` |
+| `ConversationalAutomation` | `phone_id` + edge (write), `phone_id` node (read) | **no** — `edge_path` and `node_path` on the same `Transport` |
 | `Account` | `waba_id`, no edge | yes — `Account::Transport#node_path` |
 
 ### `Account`
@@ -139,11 +157,14 @@ call. Two consequences worth knowing before touching this directory:
    action)` addresses `phone_id` and always appends an edge segment; the node endpoint
    needs neither. `Account::Transport#node_path(client)` addresses `waba_id` with no
    extra segment. Since both now delegate the guard and its message to
-   `Whatsapp::PathBuilding`, each file is down to one `scoped_path` call and the naming
+   `Whatsapp::PathBuilding`, each file is down to a `scoped_path` call or two and the naming
    *is* the point: `node_path` vs `edge_path` keeps the two from being confused at a call
    site, even though `Account::Transport` shadows the outer `Transport` by lexical scope
    inside `module Account`. Do not collapse them into one method with an optional
-   segment — that would put an edge and a node behind the same name.
+   segment — that would put an edge and a node behind the same name. The outer `Transport`
+   now has a `node_path` of its own too (for `ConversationalAutomation::Get`), and that is
+   consistent: within each transport, `node_path` means *that transport's ID with no edge*.
+   Inside `module Account` it is the WABA node, everywhere else the phone number node.
 2. **`Account::Update` reuses `BusinessPhoneNumber::Response`.** The endpoint answers
    with a bare `{"success": true}` — exactly the shape the existing class already
    models, and exactly the case its one-class-for-all rationale was written for. Write
@@ -274,6 +295,52 @@ side on `Contact`, `Message::Base`, `Status`, `Message::System`, `UserIdUpdate::
 predictable mistake. Portfolio membership, by contrast, is account state the gem cannot see
 and is left to Meta — there is a spec pinning that deliberate gap.
 
+### `ConversationalAutomation`
+
+The in-chat helpers a user meets on opening a chat: up to 4 ice breakers (`prompts`), up to
+30 `/commands`, and the `enable_welcome_message` switch. Meta files the reference under
+"WhatsApp Business Account", but both endpoints address `phone_id`, so it lives here with no
+new transport and no new error class.
+
+Five decisions worth recording:
+
+1. **The read is a node field, not an edge `GET`.** Current docs document only
+   `GET /{phone_id}?fields=conversational_automation`. An edge form
+   (`GET /{phone_id}/conversational_automation`) appears only in an archived 2025 copy of the
+   guide, so it is not used. That made `ConversationalAutomation::Get` the first caller of
+   `Transport#node_path`. `Get` takes no `fields:`, because the field *is* the endpoint.
+2. **`Update`, not `Configure`/`Set`.** Meta documents only `POST` and no `DELETE`, so one write
+   class creates, changes, and clears. `Update` matches `Profile`/`Account` and convention 7's
+   partial-update meaning (an omitted field is compacted away). `Set` would shadow `::Set`.
+   Clearing is `false` / `[]`, both of which survive `.compact`. `Update` reuses
+   `BusinessPhoneNumber::Response` (bare `{success}`). It sends no `messaging_product`, since
+   Meta documents none for this edge.
+3. **`Command` is write-side only; `Details#commands` stays raw hashes.** That is the
+   `MessageTemplates::Response::Node#components` rule: write-side validators must never run
+   over what Meta echoes, or a limit Meta loosens would make reads fail. `Update` accepts
+   hashes with symbol *or string* keys, so `Get.call.commands` round-trips into `Update`.
+   That matters because a sent list very likely replaces the stored one, so adding one
+   command means read, append, write.
+4. **Commands are built during validation**, the `Messages::Interactive::CarouselCards`
+   pattern. A bad entry (its own `ValidationError`, a missing/unknown keyword, a non-Hash) is
+   reported on `:commands` with its index, and `valid?` never raises. Uniqueness of
+   `command_name` (documented) runs only once every command has built. `Update#describe`
+   repeats `Interactive.nested_error_message` rather than reaching into `Messages`, since
+   that helper belongs to another feature.
+5. **"No emoji" is enforced, carefully.** Meta documents "Emojis are not supported" for both
+   prompts and commands, so per convention 6 it is checked. `Limits::EMOJI_PATTERN` matches
+   what *renders* as an emoji (`\p{Emoji_Presentation}`, a pictograph + U+FE0F, regional
+   indicators, the keycap U+20E3), **not** bare `\p{Emoji}`/`\p{Extended_Pictographic}`,
+   which would reject `©`, `™`, and `#`. A bare text-presentation `✈` gets through; Meta has
+   the final say. `Messages::Reaction::EMOJI_PATTERN` is not reusable: it asserts *exactly
+   one* emoji, this asks *contains any*. `Limits` has its own file because it has two
+   consumers (`Update` and `Command`), per convention 5's reasoning.
+
+Two judgment calls, both pinned by specs: a leading `/` on `command_name` is **rejected,
+not stripped** (Meta's wording is "without leading slash", and silently rewriting it would
+hide the mistake), and a **blank prompt is rejected**, the one rule here Meta does not spell
+out. A blank ice breaker can't be tapped.
+
 ## Conventions
 
 Same as `../subscribed_app/CLAUDE.md` unless noted:
@@ -336,6 +403,8 @@ Same as `../subscribed_app/CLAUDE.md` unless noted:
 | `Username::Delete.call` | `DELETE /{phone_id}/username` | `Response` |
 | `Username::Suggest.call` | `GET /{phone_id}/username_suggestions` | `Username::Suggestions` |
 | `ContactBook::Delete.call(bsuid:)` | `DELETE /{phone_id}/contact_book` | `ContactBook::Deletion` |
+| `ConversationalAutomation::Get.call` | `GET /{phone_id}?fields=conversational_automation` | `ConversationalAutomation::Details` |
+| `ConversationalAutomation::Update.call(enable_welcome_message:, prompts:, commands:)` | `POST /{phone_id}/conversational_automation` | `Response` |
 
 The four onboarding actions and the two `Profile` actions require `phone_id` (set via
 `Whatsapp.configure` or `Client.new(phone_id:)`) and the `whatsapp_business_messaging` +
@@ -396,6 +465,11 @@ Whatsapp::BusinessPhoneNumber::Username::Claim.new(username: "JaspersMarket").se
 
 Whatsapp::BusinessPhoneNumber::ContactBook::Delete.new(bsuid: "US.13491208655302741918").serialize
 # => { messaging_product: "whatsapp", bsuid: "US.13491208655302741918" }
+
+Whatsapp::BusinessPhoneNumber::ConversationalAutomation::Update.new(
+  enable_welcome_message: false, prompts: [], commands: []
+).serialize
+# => { enable_welcome_message: false, prompts: [], commands: [] }
 ```
 
 ### Unverified against a live WABA
@@ -433,6 +507,19 @@ account. Four things to confirm:
 - whether `DELETE /{phone_id}/contact_book` rejects a parent BSUID with a distinguishable
   error code. The local guard means it should never reach the API from this gem.
 
+`ConversationalAutomation` is likewise built from Meta's published docs, not a live account.
+Five things to confirm:
+
+- whether a `POST` that leaves out a field keeps its current value, and whether a list you
+  send replaces the stored one (assumed per Graph API convention)
+- whether `prompts: []` / `commands: []` / `enable_welcome_message: false` really clear
+  settings (a third-party connector says so; Meta does not)
+- whether the read still returns `enable_welcome_message` (the 2025 sample did, the current
+  one does not; `Details` tolerates either)
+- whether `request_welcome` webhooks are delivered at all (Meta's guide said the feature was
+  "not functioning as intended" before removing the section)
+- whether `422` means "phone number not verified", as a third-party connector documents
+
 ## Not implemented
 
 - **Client-side rate-limit tracking.** `register`/`deregister` document a hard cap (10
@@ -456,6 +543,11 @@ account. Four things to confirm:
   addresses a *business portfolio* ID, which `Configuration` does not hold, and it lives on
   `api.facebook.com` rather than the configured `graph.facebook.com` host — two new concepts
   for one read that only enrolled managed businesses can call.
+- **The edge-form conversational automation read** (`GET /{phone_id}/conversational_automation`).
+  Only an archived copy of Meta's guide shows it; `Get` uses the documented `?fields=` form.
+- **A typed `request_welcome` webhook message.** It falls through to
+  `Webhook::Message::Unknown` safely. Add it to `Webhook::Message::MESSAGE_TYPES` only once
+  Meta documents it again and the feature works.
 - **A `bin/dev` smoke test.** Unlike the throwaway template the existing smoke flow
   creates and deletes, exercising this flow against a real number is destructive and
   rate-limited.
@@ -468,5 +560,6 @@ account. Four things to confirm:
       `# @!attribute` tag and any validation Meta documents as a client-side rule
 - [ ] Thread it through that class's `.call`/`#serialize`
 - [ ] Add a row/example to this file and to `docs/business_phone_number/README.md`
-      (or `account.md` / `profile.md` for an `Account` / `Profile` field)
+      (or `account.md` / `profile.md` / `conversational_automation.md` for an `Account` /
+      `Profile` / `ConversationalAutomation` field)
 - [ ] `bundle exec rake` green before committing
