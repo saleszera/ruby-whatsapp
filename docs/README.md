@@ -63,6 +63,7 @@ Full reference for [ruby-whatsapp](https://github.com/saleszera/ruby-whatsapp). 
 | [business_phone_number/profile.md](business_phone_number/profile.md) | Reading and updating the business profile a user sees |
 | [business_phone_number/username.md](business_phone_number/username.md) | Claiming and managing the searchable business username |
 | [business_phone_number/contact_book.md](business_phone_number/contact_book.md) | Removing a stored user contact from Meta's contact book |
+| [business_phone_number/conversational_automation.md](business_phone_number/conversational_automation.md) | Ice breakers, `/commands`, and the welcome message |
 
 ## Reading order
 

@@ -171,6 +171,7 @@ response.contacts.first.wa_id  # => "15551234567"
 | [**Business Phone Numbers**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/README.md) | Onboarding: request code → verify → register |
 | [**Business Account**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/account.md) | Reading and updating the account: name, timezone, review status |
 | [**Business Profile**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/profile.md) | The profile a user sees: about, description, address, vertical, picture |
+| [**Conversational Automation**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/conversational_automation.md) | Ice breakers, `/commands`, and the welcome message |
 | [**Errors**](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/errors.md) | The exception hierarchy and retry strategy |
 
 Or start at the [documentation index](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/README.md).
@@ -432,11 +433,29 @@ result = Whatsapp::BusinessPhoneNumber::ContactBook::Delete.call(bsuid: "US.1349
 result.deleted  # => false means there was simply nothing stored, not a failure
 ```
 
+**Conversational automation**: the ice breakers a user can tap and the `/commands` they see
+after typing a slash. Also on the same `phone_id`:
+
+```ruby
+Whatsapp::BusinessPhoneNumber::ConversationalAutomation::Update.call(
+  prompts: ["Book a flight", "Plan a vacation"],
+  commands: [{ command_name: "tickets", command_description: "Book flight tickets" }]
+).success
+# => true
+
+Whatsapp::BusinessPhoneNumber::ConversationalAutomation::Get.call.prompts
+# => ["Book a flight", "Plan a vacation"]
+```
+
+Meta documents no `DELETE`. Empty arrays clear the lists, and every documented limit (4
+prompts of 80 characters, 30 commands, no emoji) is checked before the request.
+
 → **[Business phone numbers](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/README.md)**
 · [the business account](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/account.md)
 · [the business profile](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/profile.md)
 · [business usernames](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/username.md)
 · [the contact book](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/contact_book.md)
+· [conversational automation](https://github.com/saleszera/ruby-whatsapp/blob/main/docs/business_phone_number/conversational_automation.md)
 
 ## 🚨 Errors
 

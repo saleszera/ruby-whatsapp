@@ -32,6 +32,10 @@ Addresses your **phone number** (`phone_id`, not `waba_id`), like
 > [`ContactBook::Delete`](contact_book.md) forgets a stored user contact. Both address
 > `phone_id`, like the four actions below.
 
+> **Looking for ice breakers, `/commands`, or the welcome message?**
+> [`ConversationalAutomation::Get` / `Update`](conversational_automation.md) read and configure
+> the in-chat helpers a user sees when they open a chat. They address `phone_id` too.
+
 > **Unrelated to [`SubscribedApp`](../subscribed_app/README.md).** That turns *webhook
 > delivery* on and off for a whole WhatsApp Business Account. This is per phone number
 > and has nothing to do with notifications.
@@ -65,6 +69,8 @@ Whatsapp::BusinessPhoneNumber::Deregister.call
 | [`Username::Delete.call`](username.md) | `DELETE /{phone_id}/username` | `Response` |
 | [`Username::Suggest.call`](username.md) | `GET /{phone_id}/username_suggestions` | `Username::Suggestions` |
 | [`ContactBook::Delete.call(bsuid:)`](contact_book.md) | `DELETE /{phone_id}/contact_book` | `ContactBook::Deletion` |
+| [`ConversationalAutomation::Get.call`](conversational_automation.md) | `GET /{phone_id}?fields=conversational_automation` | `ConversationalAutomation::Details` |
+| [`ConversationalAutomation::Update.call(enable_welcome_message:, prompts:, commands:)`](conversational_automation.md) | `POST /{phone_id}/conversational_automation` | `Response` |
 
 Every action accepts an optional `client:` and raises
 `Whatsapp::BusinessPhoneNumber::Error` if `phone_id` is missing or the API rejects the
